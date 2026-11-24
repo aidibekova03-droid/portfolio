@@ -30,6 +30,112 @@
   var BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(function (v) { return (v + 0.5) / 16; });
   function bayer(x, y) { return BAYER[(y & 3) * 4 + (x & 3)]; }
   function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
+  function emit(name, detail) { try { doc.dispatchEvent(new CustomEvent(name, { detail: detail })); } catch (e) { /* old browser */ } }
+
+  /* ---------------------------------------------------------
+     Sound: soft 8-bit effects synthesised with WebAudio (no files).
+     Off by default. Nothing is created until the visitor turns it on
+     (or, with the preference remembered, until their first click or
+     key press), so the page never autoplays.
+     --------------------------------------------------------- */
+  var SFX = (function () {
+    var on = false, ac = null, out = null, last = {}, noiseBuf = null;
+    try { on = localStorage.getItem("neko-sound") === "1"; } catch (e) { /* storage blocked */ }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    function wake() {
+      if (!AC || !on) return null;
+      if (!ac) {
+        try { ac = new AC(); } catch (e) { return null; }
+        out = ac.createGain(); out.gain.value = 0.16;
+        var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5200;
+        out.connect(lp); lp.connect(ac.destination);
+      }
+      if (ac.state === "suspended") ac.resume();
+      return ac;
+    }
+    /* a soft square/triangle note with a short envelope; f2 slides the pitch */
+    function note(f, t0, dur, o) {
+      o = o || {};
+      var osc = ac.createOscillator(), g = ac.createGain();
+      osc.type = o.type || "square";
+      osc.frequency.setValueAtTime(f, t0);
+      if (o.f2) osc.frequency.exponentialRampToValueAtTime(o.f2, t0 + dur);
+      var v = o.vol || 0.5;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(v, t0 + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g); g.connect(o.dest || out);
+      osc.start(t0); osc.stop(t0 + dur + 0.02);
+      return osc;
+    }
+    function noise(t0, dur, o) {
+      o = o || {};
+      if (!noiseBuf) {
+        noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+        var d = noiseBuf.getChannelData(0);
+        for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = noiseBuf;
+      f.type = o.filter || "bandpass"; f.Q.value = o.q || 1.2;
+      f.frequency.setValueAtTime(o.f || 1800, t0);
+      if (o.f2) f.frequency.exponentialRampToValueAtTime(o.f2, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(o.vol || 0.4, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(f); f.connect(g); g.connect(out);
+      src.start(t0); src.stop(t0 + dur + 0.02);
+    }
+    var SOUNDS = {
+      blip: function (t) { note(990, t, 0.035, { vol: 0.22 }); },
+      select: function (t) { note(784, t, 0.05, { vol: 0.3 }); note(1175, t + 0.05, 0.07, { vol: 0.3 }); },
+      pip: function (t) { note(1320 + Math.random() * 120, t, 0.018, { vol: 0.12 }); },
+      page: function (t) { noise(t, 0.16, { f: 2600, f2: 700, vol: 0.35 }); note(523, t + 0.06, 0.08, { type: "triangle", vol: 0.35 }); note(659, t + 0.12, 0.1, { type: "triangle", vol: 0.3 }); },
+      chest: function (t) { [523, 659, 784, 1047].forEach(function (f, i) { note(f, t + i * 0.08, i === 3 ? 0.3 : 0.09, { vol: 0.32 }); }); note(1568, t + 0.32, 0.25, { type: "triangle", vol: 0.18 }); },
+      meow: function (t) {
+        /* a rising then falling glide through a vowel-ish band-pass */
+        var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1300; bp.Q.value = 1.6; bp.connect(out);
+        var o = note(560, t, 0.38, { type: "sawtooth", vol: 0.5, dest: bp });
+        o.frequency.linearRampToValueAtTime(840, t + 0.1); o.frequency.exponentialRampToValueAtTime(430, t + 0.38);
+      },
+      purr: function (t) {
+        /* a low rumble, pulsed about 25 times a second */
+        var osc = ac.createOscillator(), lp = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+        osc.type = "sawtooth"; osc.frequency.value = 48;
+        lp.type = "lowpass"; lp.frequency.value = 380;
+        lfo.type = "square"; lfo.frequency.value = 24; lg.gain.value = 0.12;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+        lfo.connect(lg); lg.connect(g.gain);
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(t); lfo.start(t); osc.stop(t + 0.85); lfo.stop(t + 0.85);
+      },
+      step: function (t) { noise(t, 0.04, { filter: "lowpass", f: 900, vol: 0.3 }); },
+      whoosh: function (t) { noise(t, 0.32, { f: 400, f2: 2400, q: 0.8, vol: 0.28 }); },
+      arrive: function (t) { note(392, t, 0.07, { vol: 0.25 }); note(587, t + 0.07, 0.12, { vol: 0.25 }); },
+      swat: function (t) { noise(t, 0.07, { f: 3000, f2: 1200, vol: 0.3 }); },
+      plink: function (t) { note(1760, t, 0.06, { type: "triangle", vol: 0.3 }); note(2350, t + 0.05, 0.08, { type: "triangle", vol: 0.2 }); },
+      alert: function (t) { note(880, t, 0.05, { vol: 0.2, f2: 1320 }); },
+      toggle: function (t) { note(659, t, 0.06, { vol: 0.3 }); note(988, t + 0.06, 0.1, { vol: 0.3 }); }
+    };
+    var GAP = { blip: 45, pip: 40, purr: 1500, meow: 1500, step: 60 };
+    return {
+      get on() { return on; },
+      set: function (v) {
+        on = !!v;
+        try { localStorage.setItem("neko-sound", on ? "1" : "0"); } catch (e) { /* ignore */ }
+        if (on) wake(); else if (ac && ac.state === "running") ac.suspend();
+      },
+      /* only after a real gesture: called from click/keydown handlers */
+      unlock: function () { if (on) wake(); },
+      play: function (name) {
+        if (!on || !ac || ac.state !== "running" || !SOUNDS[name]) return;
+        var now = performance.now();
+        if (GAP[name] && now - (last[name] || 0) < GAP[name]) return;
+        last[name] = now;
+        try { SOUNDS[name](ac.currentTime + 0.005); } catch (e) { /* never let sound break the page */ }
+      }
+    };
+  })();
 
   /* ---------------------------------------------------------
      Sprites
@@ -301,7 +407,9 @@
         f.vx += (Math.random() - 0.5) * 0.03; f.vy += (Math.random() - 0.5) * 0.03;
         var dx = mouse.lx - f.x, dy = mouse.ly - f.y, dist = Math.hypot(dx, dy);
         if (dist < 46 && dist > 3) { f.vx += dx / dist * 0.02; f.vy += dy / dist * 0.02; }
-        var sp = Math.hypot(f.vx, f.vy), max = 0.32;
+        /* a startled firefly (the cat pounced) may dart faster for a moment */
+        var sp = Math.hypot(f.vx, f.vy), max = f.boost > 0 ? 1.1 : 0.32;
+        if (f.boost > 0) f.boost -= dt;
         if (sp > max) { f.vx *= max / sp; f.vy *= max / sp; }
         f.x += f.vx * dt; f.y += f.vy * dt;
         if (f.x < -4) f.x = W + 3; if (f.x > W + 4) f.x = -3;
@@ -364,6 +472,27 @@
     function start() { if (!raf && !RM) { last = performance.now(); raf = requestAnimationFrame(loop); } }
     function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
 
+    /* fireflies for the cat to chase, in viewport coordinates */
+    canvas.nekoScene = {
+      flies: function () {
+        var r = canvas.getBoundingClientRect();
+        return flies.map(function (f, i) { return { i: i, x: r.left + f.x * px, y: r.top + f.y * px }; });
+      },
+      fly: function (i) {
+        var f = flies[i];
+        if (!f || !raf) return null;
+        var r = canvas.getBoundingClientRect();
+        return { x: r.left + f.x * px, y: r.top + f.y * px };
+      },
+      scare: function (cx, cy) {
+        var r = canvas.getBoundingClientRect(), x = (cx - r.left) / px, y = (cy - r.top) / px;
+        flies.forEach(function (f) {
+          var dx = f.x - x, dy = f.y - y, d = Math.hypot(dx, dy) || 1;
+          if (d < 22) { f.vx = dx / d * 1.1; f.vy = dy / d * 1.1 - 0.3; f.boost = 24; }
+        });
+      }
+    };
+
     build();
     render(performance.now());
     if (!RM) {
@@ -404,6 +533,10 @@
     party.appendChild(partySpr);
     $(".map__nodes", map).insertAdjacentElement("beforebegin", party);
     paintSprites(party);
+    /* footprints left behind while travelling */
+    var steps = doc.createElement("canvas");
+    steps.className = "map__steps"; steps.setAttribute("aria-hidden", "true");
+    canvas.insertAdjacentElement("afterend", steps);
     var route = { samples: [], at: [], px: 3, node: 0 };
     /* where the marker stands for landmark i: a few steps along the trail, clear of its sign */
     function anchor(i) {
@@ -461,7 +594,8 @@
       }
       samples.push(pts[pts.length - 1]);
       at.push(samples.length - 1);
-      route.samples = samples; route.at = at; route.px = px; route.mobile = mobile;
+      route.samples = samples; route.at = at; route.px = px; route.mobile = mobile; route.W = W; route.H = H;
+      if (steps) { steps.width = W; steps.height = H; }
       place(anchor(route.node));
 
       var lake = mobile ? { x: W * 0.78, y: H * 0.075, rx: Math.max(10, W * 0.13), ry: Math.max(7, H * 0.045) }
@@ -563,6 +697,130 @@
     draw();
     var lw = map.clientWidth;
     window.addEventListener("resize", debounce(function () { if (map.clientWidth !== lw) { lw = map.clientWidth; draw(); } }, 160));
+
+    /* ---- fast travel: walk the trail, close the iris, open on the destination ---- */
+    var NAMES = nodes.map(function (n) { var b = $(".node__plate b", n); return b ? b.textContent : ""; });
+    var busy = false;
+    function jump(href) {
+      var el = href.charAt(0) === "#" ? doc.getElementById(href.slice(1)) : null;
+      if (!el) { location.href = href; return false; }
+      el.scrollIntoView({ behavior: "auto", block: "start" });
+      if (history.pushState) history.pushState(null, "", href);
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+      el.focus({ preventScroll: true });
+      emit("neko:goto", { el: el });
+      return true;
+    }
+    function walk(to, done) {
+      var from = anchor(route.node), sm = route.samples, dir = to >= from ? 1 : -1, count = Math.abs(to - from);
+      var sctx = steps.getContext("2d");
+      sctx.clearRect(0, 0, steps.width, steps.height);
+      steps.classList.remove("is-fading");
+      if (!count) { done(); return; }
+      /* samples sit about half an art pixel apart; walk roughly 330 art px a second, capped */
+      var dur = clamp(count / 2 / 330 * 1000, 280, 750), t0 = performance.now(), lastPrint = from, foot = 1;
+      party.classList.add("is-walking");
+      (function frame(now) {
+        var p = Math.min(1, (now - t0) / dur);
+        var k = from + dir * Math.round(count * p);
+        place(k);
+        /* a footprint every few art pixels, alternating sides of the trail */
+        while (Math.abs(k - lastPrint) >= 9) {
+          lastPrint += dir * 9;
+          var a = sm[lastPrint], b = sm[lastPrint + dir] || a;
+          var ang = Math.atan2(b[1] - a[1], b[0] - a[0]) + Math.PI / 2;
+          foot = -foot;
+          sctx.fillStyle = "#4e3b1f";
+          sctx.fillRect(Math.round(a[0] + Math.cos(ang) * foot), Math.round(a[1] + Math.sin(ang) * foot), 1, 1);
+          SFX.play("step");
+        }
+        if (p < 1) requestAnimationFrame(frame);
+        else { party.classList.remove("is-walking"); setTimeout(done, 120); }
+      })(t0);
+    }
+    function travel(i, href) {
+      if (busy) return;
+      var to = anchor(i);
+      if (RM) { route.node = i; place(to); jump(href); return; }
+      busy = true;
+      SFX.play("select");
+      walk(to, function () {
+        route.node = i;
+        var r = party.getBoundingClientRect();
+        iris(NAMES[i], r.left + r.width / 2, r.top + r.height / 2, function () { return jump(href); }, function () {
+          busy = false;
+          steps.classList.add("is-fading");
+        });
+      });
+    }
+    map.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest(".node");
+      if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      travel(nodes.indexOf(a), a.getAttribute("href"));
+    });
+    /* scrolling around the world moves the marker too (while the map is out of sight) */
+    doc.addEventListener("neko:area", function (e) {
+      if (busy || !e.detail) return;
+      var r = map.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < window.innerHeight) return;
+      var i = nodes.findIndex(function (n) { return n.getAttribute("href") === "#" + e.detail.id; });
+      if (i >= 0 && i !== route.node) { route.node = i; place(anchor(i)); }
+    });
+    window.addEventListener("pageshow", function (e) { if (e.persisted) { busy = false; irisReset(); } });
+  }
+
+  /* ---------------------------------------------------------
+     Iris wipe: a pixel circle closes on the traveller, a plate names
+     the destination, and the circle opens again on arrival.
+     --------------------------------------------------------- */
+  var irisEl = null;
+  function irisReset() { if (irisEl) irisEl.classList.remove("is-on", "is-label"); }
+  function iris(name, cx, cy, mid, end) {
+    if (!irisEl) {
+      irisEl = doc.createElement("div");
+      irisEl.className = "iris"; irisEl.setAttribute("aria-hidden", "true");
+      irisEl.innerHTML = '<canvas></canvas><p class="iris__plate frame-dark"><small>Travelling to</small><b></b></p>';
+      doc.body.appendChild(irisEl);
+    }
+    var cvs = $("canvas", irisEl), c = cvs.getContext("2d"), B = 6;
+    var W = Math.ceil(window.innerWidth / B), H = Math.ceil(window.innerHeight / B);
+    cvs.width = W; cvs.height = H;
+    $("b", irisEl).textContent = name;
+    var night = hex("#0b1d22"), ring = hex("#f5c451"), ink = hex("#120f17");
+    function drawR(r, ox, oy) {
+      var img = c.createImageData(W, H), d = img.data;
+      for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+        var dd = Math.hypot(x + 0.5 - ox, y + 0.5 - oy), k = (y * W + x) * 4, col = null;
+        if (dd >= r + 2) col = night; else if (dd >= r + 1) col = ink; else if (dd >= r) col = ring;
+        if (col) { d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255; }
+      }
+      c.putImageData(img, 0, 0);
+    }
+    function run(from, to, ox, oy, cb) {
+      var n = 7, i = 0;
+      (function tick() {
+        var r = from + (to - from) * (i / n);
+        drawR(r, ox, oy);
+        if (i++ < n) setTimeout(tick, 40); else cb();
+      })();
+    }
+    var bx = cx / B, by = cy / B;
+    var far = function (ox, oy) { return Math.max(Math.hypot(ox, oy), Math.hypot(W - ox, oy), Math.hypot(ox, H - oy), Math.hypot(W - ox, H - oy)) + 3; };
+    irisEl.classList.add("is-on");
+    SFX.play("whoosh");
+    run(far(bx, by), -3, bx, by, function () {
+      irisEl.classList.add("is-label");
+      setTimeout(function () {
+        var stay = mid() === false; /* leaving for another page: keep the curtain closed */
+        if (stay) { if (end) end(); return; }
+        setTimeout(function () {
+          irisEl.classList.remove("is-label");
+          SFX.play("arrive");
+          run(-3, far(W / 2, H / 2), W / 2, H / 2, function () { irisEl.classList.remove("is-on"); if (end) end(); });
+        }, 140);
+      }, 360);
+    });
   }
 
   /* ---------------------------------------------------------
@@ -1116,6 +1374,7 @@
       if (i >= chars.length) { done(); return; }
       chars[i].classList.add("on");
       var ch = chars[i].textContent; i++;
+      if (i % 2 && ch.trim()) SFX.play("pip");
       setTimeout(tick, /[.,]/.test(ch) ? 180 : 30);
     }
     setTimeout(tick, 1100);
@@ -1272,6 +1531,7 @@
       if (history.pushState) history.pushState(null, "", "#" + id);
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
       el.focus({ preventScroll: true });
+      emit("neko:goto", { el: el });
     });
   }
 
@@ -1298,7 +1558,13 @@
         if (id === current) return;
         current = id;
         links.forEach(function (a) { if (a.getAttribute("data-area") === id) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current"); });
-        if (userMoved && AREAS[id]) showBanner(AREAS[id]);
+        if (userMoved && AREAS[id]) {
+          showBanner(AREAS[id]);
+          /* entering an area: its sign gives a single hop */
+          var icon = !RM && $(".area-head__icon", en.target);
+          if (icon) { icon.classList.remove("is-hop"); void icon.offsetWidth; icon.classList.add("is-hop"); }
+        }
+        emit("neko:area", { id: id });
       });
     }, { rootMargin: "-42% 0px -52% 0px" });
     Object.keys(AREAS).forEach(function (id) { var el = doc.getElementById(id); if (el) io.observe(el); });
@@ -1338,10 +1604,26 @@
     function run() {
       if (fired) return; fired = true;
       items.forEach(function (li, i) { setTimeout(function () { li.classList.add("done"); }, 250 + i * 230); });
+      setTimeout(complete, 250 + items.length * 230 + 200);
     }
-    var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { run(); io.disconnect(); } }, { threshold: 0.5 });
+    /* the last objective ticks: a "quest complete" toast, if the list is on screen to earn it */
+    function complete() {
+      var r = list.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) return;
+      var panel = list.closest(".quest"), title = panel && $(".quest__title", panel);
+      var t = doc.createElement("div");
+      t.className = "toast frame-dark"; t.setAttribute("aria-hidden", "true");
+      t.innerHTML = '<i class="spr" data-spr="star"></i><span><small>Quest complete</small><b></b></span>';
+      $("b", t).textContent = title ? title.textContent : "";
+      doc.body.appendChild(t);
+      paintSprites(t);
+      requestAnimationFrame(function () { t.classList.add("is-on"); });
+      SFX.play("chest");
+      setTimeout(function () { t.classList.remove("is-on"); setTimeout(function () { t.remove(); }, 600); }, 3200);
+    }
+    /* ticks (and the toast) wait until the list is really on screen */
+    var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { run(); io.disconnect(); } }, { threshold: 0.4 });
     io.observe(list);
-    setTimeout(run, 4500);
   }
 
   /* ---------------------------------------------------------
@@ -1375,7 +1657,8 @@
         sl.style.visibility = Math.abs(r) > 1 ? "hidden" : "";
       });
     }
-    function go(k) {
+    function go(k, quiet) {
+      if (!quiet) { SFX.play("page"); emit("neko:carousel", { room: (k + n) % n }); }
       i = (k + n) % n;
       slides.forEach(function (s, j) {
         s.classList.toggle("is-active", j === i);
@@ -1402,7 +1685,7 @@
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     window.addEventListener("resize", debounce(function () { layout(); }, 120));
-    go(0);
+    go(0, true);
   }
 
   /* ---------------------------------------------------------
@@ -1485,53 +1768,77 @@
   }
 
   /* ---------------------------------------------------------
-     The cat — an original desktop pet
+     The cat — an original desktop pet.
+     Follows the cursor, sleeps, grooms, purrs when petted. She also
+     knows where she is: she trots to an area's heading when you jump
+     there, bats a toy off a card edge when you leave her be, her eyes
+     catch the torchlight in the Gallery Dungeon, she chases fireflies
+     in the village and curls up by the campfire. She never parks on a
+     link or control, and stays below the HUD.
      --------------------------------------------------------- */
   function initCat() {
     if (!S.catSit) return;
     var toggle = $(".hud__cat");
     var SC = 3, FW = 22, FH = 18; /* frame incl. 1px halo */
-    var NAMES = ["catWalkA", "catWalkB", "catSit", "catBlink", "catGroomA", "catGroomB", "catSleepA", "catSleepB"];
-    var frames = {};
-    var basePal = PAL;
-    function makeFrame(rows, flip, pal) {
+    var NAMES = ["catWalkA", "catWalkB", "catSit", "catBlink", "catGroomA", "catGroomB", "catSleepA", "catSleepB", "catBatA", "catBatB"];
+    var frames = {}, glowFrames = {};
+    function makeFrame(rows, flip, pal, glow) {
       var c = doc.createElement("canvas");
       c.width = FW * SC; c.height = FH * SC;
       var x = c.getContext("2d");
       var w = rows[0].length, h = rows.length;
-      var solid = function (cx, cy) { return cx >= 0 && cy >= 0 && cx < w && cy < h && rows[cy].charAt(cx) !== "."; };
+      var at = function (cx, cy) { return cx >= 0 && cy >= 0 && cx < w && cy < h ? rows[cy].charAt(cx) : "."; };
+      var fxp = function (cx) { return ((flip ? (w - 1 - cx) : cx) + 1) * SC; };
       x.fillStyle = "rgba(244,234,208,.62)";
       for (var yy = -1; yy <= h; yy++) for (var xx = -1; xx <= w; xx++) {
-        if (solid(xx, yy)) continue;
-        var near = false;
-        for (var oy = -1; oy <= 1 && !near; oy++) for (var ox = -1; ox <= 1; ox++) if ((ox || oy) && solid(xx + ox, yy + oy) && !(ox && oy)) { near = true; break; }
-        if (near) { var fx = flip ? (w - 1 - xx) : xx; x.fillRect((fx + 1) * SC, (yy + 1) * SC, SC, SC); }
+        if (at(xx, yy) !== ".") continue;
+        if (at(xx - 1, yy) !== "." || at(xx + 1, yy) !== "." || at(xx, yy - 1) !== "." || at(xx, yy + 1) !== ".") x.fillRect(fxp(xx), (yy + 1) * SC, SC, SC);
       }
       drawSprite(x, rows, SC, SC, SC, { flip: flip, pal: pal });
+      if (glow) {
+        /* torchlit eyes: a warm pixel of glow around each lit eye */
+        x.fillStyle = "rgba(255,214,102,.5)";
+        for (var gy = 0; gy < h; gy++) for (var gx = 0; gx < w; gx++) {
+          if (at(gx, gy) !== "e") continue;
+          [[-1, 0], [1, 0], [0, -1]].forEach(function (o) { if (at(gx + o[0], gy + o[1]) !== "e") x.fillRect(fxp(gx + o[0]), (gy + o[1] + 1) * SC, SC, SC); });
+        }
+      }
       return c;
     }
     function buildFrames(pal) {
-      NAMES.forEach(function (n) { frames[n] = [makeFrame(S[n], false, pal), makeFrame(S[n], true, pal)]; });
+      var lit = Object.assign({}, pal, { e: "#ffe680" });
+      NAMES.forEach(function (n) {
+        frames[n] = [makeFrame(S[n], false, pal), makeFrame(S[n], true, pal)];
+        glowFrames[n] = [makeFrame(S[n], false, lit, true), makeFrame(S[n], true, lit, true)];
+      });
     }
-    buildFrames(basePal);
+    buildFrames(PAL);
 
     var cv = doc.createElement("canvas");
     cv.className = "neko"; cv.width = FW * SC; cv.height = FH * SC; cv.setAttribute("aria-hidden", "true");
     doc.body.appendChild(cv);
     var ctx = cv.getContext("2d");
 
-    var vw = window.innerWidth, vh = window.innerHeight;
+    var vw = window.innerWidth, vh = window.innerHeight, hudB = 80;
+    function measure() {
+      vw = window.innerWidth; vh = window.innerHeight;
+      var h = $(".hud__inner"); hudB = h ? Math.round(h.getBoundingClientRect().bottom) : 70;
+    }
+    measure();
     var touchy = window.matchMedia && matchMedia("(hover: none)").matches;
     var cat = {
       x: touchy ? vw - 52 : 70, y: vh - 10, mode: "sleep", face: 1, frame: "catSleepA",
-      since: performance.now(), nextGroom: 0, lastAnim: 0, alt: false, nextBlink: 0
+      since: performance.now(), nextGroom: 0, nextBlink: 0, hop: 0
     };
     var target = { x: cat.x, y: cat.y }, pointer = { x: -1, y: -1, t: 0, moved: false };
     var enabled = true, raf = 0, last = 0, petting = false, lastPet = 0, lastZ = 0, drawn = "";
     var STOP = 26;
+    var auto = null, cool = {}, zone = "", lastZone = 0, lastCheck = 0, toys = [], toyN = 0;
+    var CTRL = "a[href], button, input, select, textarea, [role=tab], [role=option]";
 
     try { if (localStorage.getItem("neko-off") === "1") enabled = false; } catch (e) { /* storage blocked */ }
 
+    function minY() { return hudB + FH * SC + 2; }
     function rect() { return { l: cat.x - FW * SC / 2, t: cat.y - FH * SC + SC, r: cat.x + FW * SC / 2, b: cat.y + SC }; }
     function inside(px, py) { var r = rect(); return px >= r.l + 6 && px <= r.r - 6 && py >= r.t + 12 && py <= r.b; }
     function fx(text, cls, dx, dy) {
@@ -1546,68 +1853,271 @@
     }
     function setMode(m) { if (cat.mode !== m) { cat.mode = m; cat.since = performance.now(); } }
     function paint(name) {
-      var key = name + (cat.face < 0 ? "L" : "R");
+      var lit = zone === "art" && !!glowFrames[name];
+      var key = name + (cat.face < 0 ? "L" : "R") + (lit ? "*" : "");
       if (key !== drawn) {
         ctx.clearRect(0, 0, cv.width, cv.height);
-        ctx.drawImage(frames[name][cat.face < 0 ? 1 : 0], 0, 0);
+        ctx.drawImage((lit ? glowFrames : frames)[name][cat.face < 0 ? 1 : 0], 0, 0);
         drawn = key;
       }
-      cv.style.transform = "translate3d(" + Math.round(cat.x - FW * SC / 2) + "px," + Math.round(cat.y - FH * SC + SC) + "px,0)";
+      cv.style.transform = "translate3d(" + Math.round(cat.x - FW * SC / 2) + "px," + Math.round(cat.y - FH * SC + SC - cat.hop) + "px,0)";
     }
     function pet() {
       lastPet = performance.now();
       fx("", "neko-fx--heart", -10 + Math.random() * 10, -4);
       if (Math.random() < 0.5) fx(["prrr", "mrrp!", "purr"][Math.floor(Math.random() * 3)], "", 12, -10);
+      SFX.play(Math.random() < 0.7 ? "purr" : "meow");
       if (cat.mode === "sleep" || cat.mode === "walk") setMode("sit");
     }
 
-    function update(now, dt) {
-      var tx = target.x, ty = target.y;
-      if (pointer.moved) {
-        var side = cat.x < pointer.x ? -1 : 1;
-        tx = clamp(pointer.x + side * 40, 34, vw - 34);
-        ty = clamp(pointer.y + 30, 70, vh - 6);
+    /* ---- where she is: which area her paws are in ---- */
+    var ZONES = [["hero", ".hero"], ["map", "#map"], ["projects", "#projects"], ["art", "#art"], ["skills", "#skills"], ["blog", "#blog"], ["contact", "#contact"]]
+      .map(function (z) { return { id: z[0], el: $(z[1]) }; }).filter(function (z) { return z.el; });
+    function detectZone() {
+      var y = cat.y - 20, z = "";
+      for (var i = 0; i < ZONES.length; i++) { var r = ZONES[i].el.getBoundingClientRect(); if (y >= r.top && y < r.bottom) { z = ZONES[i].id; break; } }
+      if (z !== zone) { zone = z; drawn = ""; }
+    }
+
+    /* ---- autonomous outings ---- */
+    function startAuto(kind, opts) {
+      auto = Object.assign({ kind: kind, px: pointer.x, py: pointer.y, t: performance.now(), tol: 40 }, opts || {});
+      if (cat.mode === "sleep") { setMode("alert"); fx("!", "", 0, -6); }
+      else if (cat.mode !== "walk" && cat.mode !== "alert") setMode("walk");
+    }
+    function stopAuto() { auto = null; }
+    function textBox(el) {
+      try {
+        var rg = doc.createRange(); rg.selectNodeContents(el);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) if (rs[i].width > 4) return rs[i];
+      } catch (e) { /* fall back to the element box */ }
+      return el.getBoundingClientRect();
+    }
+    var scene = null;
+    function sceneApi() { if (!scene) { var h = $("#heroScene"); scene = h && h.nekoScene ? h.nekoScene : null; } return scene; }
+    function avoidRects() { return $$(".dlg__box, .hero h1").map(function (e) { return e.getBoundingClientRect(); }); }
+    function clearOf(rs, x, y, pad) {
+      for (var i = 0; i < rs.length; i++) { var r = rs[i]; if (x > r.left - pad && x < r.right + pad && y > r.top - pad && y < r.bottom + pad) return false; }
+      return true;
+    }
+    function pickFly() {
+      var sc = sceneApi(); if (!sc) return -1;
+      var rs = avoidRects(), best = -1, bd = 1e9;
+      sc.flies().forEach(function (f) {
+        if (f.y < minY() + 10 || f.y > vh - 50 || f.x < 40 || f.x > vw - 40 || !clearOf(rs, f.x, f.y + 34, 50)) return;
+        var d = Math.hypot(f.x - cat.x, f.y - cat.y);
+        if (d < bd && d > 60) { bd = d; best = f.i; }
+      });
+      return best;
+    }
+    function pickEdge() {
+      var best = null, bd = 640;
+      $$(".quest:not([hidden]), .skill, .note, .inv-info, .cv-card, .slot, .card, .quests__list").forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.width < 160 || r.top < minY() + 10 || r.top > vh - 40 || r.right > vw - 24) return;
+        var x = r.right - 44, d = Math.hypot(x - cat.x, r.top - cat.y);
+        if (d < bd && overControl(x, r.top + 4)) return; /* the spot must leave links and controls clear */
+        if (d < bd) { bd = d; best = el; }
+      });
+      return best;
+    }
+    /* the spot she is heading for on her own, or null when the outing no longer makes sense */
+    function autoTarget(now) {
+      var a = auto, r;
+      if (a.kind === "perch") {
+        r = textBox(a.el);
+        var py = r.top + Math.round(r.height * 0.12);
+        /* give a smooth scroll time to bring the heading in, then let go once it leaves */
+        if ((py < minY() - 4 || r.top > vh - 10) && now - a.t > 2500) { stopAuto(); return null; }
+        return { x: r.width > 140 ? r.right - 36 : r.left + r.width / 2, y: py, stop: 3, ride: true };
       }
+      if (a.kind === "edge") {
+        r = a.el.getBoundingClientRect();
+        if (r.top < minY() - 2 || r.top > vh - 8 || a.el.hidden) { stopAuto(); return null; }
+        return { x: r.right - 44, y: r.top + 4, stop: 3, ride: true };
+      }
+      if (a.kind === "fly") {
+        if (zone !== "hero") { stopAuto(); return null; }
+        var sc = sceneApi(), f = sc && sc.fly(a.i);
+        if (!f || !clearOf(avoidRects(), f.x, f.y + 34, 50)) {
+          a.i = pickFly();
+          f = a.i >= 0 && sc ? sc.fly(a.i) : null;
+          if (!f) { stopAuto(); return null; }
+        }
+        return { x: f.x, y: f.y + 34, stop: 16 };
+      }
+      if (a.kind === "fire") {
+        var fire = $(".campfire"); if (!fire) { stopAuto(); return null; }
+        r = fire.getBoundingClientRect();
+        if (r.bottom < minY() + 20 || r.top > vh - 30) { stopAuto(); return null; }
+        var fxr = r.left + r.width * 0.5 + 80;
+        return { x: fxr > vw - 40 ? r.left + r.width * 0.5 - 80 : fxr, y: r.bottom - 14, stop: 4, ride: true };
+      }
+      if (a.kind === "scoot") return { x: a.x, y: a.y, stop: 4 };
+      return null;
+    }
+    /* is she sitting on a link or control? then shuffle off it */
+    function overControl(x, y) {
+      if (x === undefined) { x = cat.x; y = cat.y; }
+      var pts = [[x - 22, y - 22], [x, y - 22], [x + 22, y - 22], [x, y - 44], [x, y - 4]];
+      for (var i = 0; i < pts.length; i++) {
+        var el = doc.elementFromPoint(pts[i][0], pts[i][1]);
+        var c = el && el.closest && el.closest(CTRL);
+        if (c && !c.closest(".hud")) return c;
+      }
+      return null;
+    }
+    function scootFrom(c) {
+      var r = c.getBoundingClientRect();
+      var x = cat.x < r.left + r.width / 2 ? r.left - 42 : r.right + 42, y = cat.y;
+      if (x < 34 || x > vw - 34) { x = clamp(cat.x, 34, vw - 34); y = r.bottom + FH * SC + 6; }
+      if (y > vh - 2) y = r.top - 8;
+      startAuto("scoot", { x: x, y: y, tol: 60 });
+    }
+
+    /* ---- toys she knocks off ledges ---- */
+    function spawnToy() {
+      var name = toyN++ % 2 ? "pebble" : "toyMouse", rows = S[name];
+      var el = doc.createElement("span");
+      el.className = "neko-toy"; el.setAttribute("aria-hidden", "true");
+      el.style.width = rows[0].length * SC + "px"; el.style.height = rows.length * SC + "px";
+      el.style.backgroundImage = "url(" + spriteURL(name) + ")";
+      doc.body.appendChild(el);
+      var t = { el: el, w: rows[0].length * SC, h: rows.length * SC, x: 0, y: 0, vx: 0, vy: 0, rot: 0, live: false, age: 0 };
+      toys.push(t);
+      return t;
+    }
+    function holdToy(t) { t.x = cat.x + 22; t.y = cat.y - t.h + SC; }
+    function stepToys(dt) {
+      for (var i = toys.length - 1; i >= 0; i--) {
+        var t = toys[i];
+        if (t.live) {
+          t.age += dt; t.vy += 0.0011 * dt; t.x += t.vx * dt; t.y += t.vy * dt;
+          t.rot = (Math.floor(t.age / 110) % 4) * 90;
+        } else if (auto && auto.toy === t) holdToy(t);
+        if (t.y > vh + 40 || t.age > 2600 || (!t.live && (!auto || auto.toy !== t))) { t.el.remove(); toys.splice(i, 1); continue; }
+        t.el.style.transform = "translate3d(" + Math.round(t.x) + "px," + Math.round(t.y) + "px,0) rotate(" + t.rot + "deg)";
+      }
+    }
+
+    function arrive(now) {
+      var k = auto && auto.kind;
+      if (k === "fly") { setMode("pounce"); return; }
+      if (k === "fire") { setMode("sleep"); fx("prrr", "", 12, -10); return; }
+      setMode("sit");
+      cat.nextGroom = now + 2200 + Math.random() * 2600;
+      if (k === "perch") fx("mrrp", "", 12, -10);
+      if (k === "scoot") stopAuto();
+    }
+
+    function update(now, dt) {
+      if (now - lastZone > 300) { lastZone = now; detectZone(); }
+      var at = auto ? autoTarget(now) : null;
+      var tx = target.x, ty = target.y, stop = STOP;
+      if (at) { tx = at.x; ty = at.y; stop = at.stop; }
+      else if (pointer.moved) {
+        var side = cat.x < pointer.x ? -1 : 1;
+        tx = pointer.x + side * 40;
+        ty = pointer.y + 30;
+      }
+      tx = clamp(tx, 34, vw - 34); ty = clamp(ty, minY(), vh - 2);
       var dx = tx - cat.x, dy = ty - cat.y, dist = Math.hypot(dx, dy);
       var idle = now - pointer.t;
       if (petting) dist = 0;
+      cat.hop = 0;
 
       switch (cat.mode) {
         case "sleep":
           cat.frame = (Math.floor(now / 900) % 2) ? "catSleepB" : "catSleepA";
           if (now - lastZ > 1700) { lastZ = now; fx("z", "", 10 * cat.face, 8); }
-          if (dist > STOP + 70 && idle < 400 && !RM) { setMode("alert"); fx("!", "", 0, -6); }
+          if (at && at.ride && dist > stop) { cat.x = tx; cat.y = ty; } /* asleep by the fire, riding the scroll */
+          else if (at && dist > stop + 30) { setMode("alert"); fx("!", "", 0, -6); }
+          else if (!at && dist > STOP + 70 && idle < 400) { setMode("alert"); fx("!", "", 0, -6); }
           break;
         case "alert":
           cat.frame = "catSit";
           if (now - cat.since > 420) setMode("walk");
           break;
         case "walk":
-          if (dist <= STOP) { setMode("sit"); cat.nextGroom = now + 2200 + Math.random() * 2600; break; }
-          var run = dist > 240;
-          var speed = (run ? 330 : 150) * dt / 1000;
-          var stepLen = Math.min(speed, dist);
+          if (dist <= stop) { if (at && at.ride) { cat.x = tx; cat.y = ty; } arrive(now); break; }
+          var run = dist > 240 || (auto && auto.kind === "fly");
+          var stepLen = Math.min((run ? 330 : 150) * dt / 1000, dist);
           cat.x += dx / dist * stepLen; cat.y += dy / dist * stepLen;
           if (Math.abs(dx) > 4) cat.face = dx < 0 ? -1 : 1;
-          var period = run ? 90 : 150;
-          cat.frame = (Math.floor(now / period) % 2) ? "catWalkB" : "catWalkA";
+          cat.frame = (Math.floor(now / (run ? 90 : 150)) % 2) ? "catWalkB" : "catWalkA";
           break;
         case "sit":
-          if (dist > STOP + 26) { setMode("walk"); break; }
-          if (pointer.x >= 0) cat.face = pointer.x < cat.x ? -1 : 1;
+        case "groom":
+          if (at && at.ride) { cat.x = tx; cat.y = ty; dist = 0; } /* sitting on a heading or card: ride it as the page scrolls */
+          if (dist > stop + (at ? 8 : 26)) { setMode("walk"); break; }
+          if (cat.mode === "groom") {
+            cat.frame = (Math.floor(now / 260) % 2) ? "catGroomB" : "catGroomA";
+            if (now - cat.since > 2600) { setMode("sit"); cat.nextGroom = now + 3500 + Math.random() * 4000; }
+            break;
+          }
+          if (!auto && pointer.x >= 0) cat.face = pointer.x < cat.x ? -1 : 1;
           cat.frame = (now > cat.nextBlink && now < cat.nextBlink + 160) ? "catBlink" : "catSit";
           if (now > cat.nextBlink + 160) cat.nextBlink = now + 1800 + Math.random() * 2600;
-          if (now > cat.nextGroom && !petting) setMode("groom");
-          if (idle > 9000 && !petting) setMode("sleep");
+          if (auto && auto.kind === "edge" && !auto.done && now - cat.since > 450) { cat.face = -1; setMode("bat"); break; }
+          if (petting) break;
+          if (now > cat.nextGroom) { setMode("groom"); break; }
+          /* things she gets up to when left alone */
+          if (!auto) {
+            var fire = zone === "contact" || zone === "blog" ? $(".campfire") : null, fr = fire && fire.getBoundingClientRect();
+            if (fr && idle > 2200 && fr.top < vh - 60 && fr.bottom > minY() + 40 && !(now < cool.fire)) { cool.fire = now + 9000; startAuto("fire"); break; }
+            if (zone === "hero" && idle > 3000 && !(now < cool.fly) && sceneApi()) {
+              cool.fly = now + 18000;
+              var fi = pickFly();
+              if (fi >= 0) { startAuto("fly", { i: fi, n: 0 }); break; }
+            }
+            if (idle > 4500 && !(now < cool.edge)) {
+              var card = pickEdge();
+              cool.edge = now + (card ? 26000 : 2500);
+              if (card) { startAuto("edge", { el: card }); break; }
+            }
+          }
+          if (idle > 12000) { setMode("sleep"); break; }
+          if (now - lastCheck > 500 && (!auto || auto.kind !== "scoot")) {
+            lastCheck = now;
+            var c = overControl();
+            if (c) scootFrom(c);
+          }
           break;
-        case "groom":
-          if (dist > STOP + 26) { setMode("walk"); break; }
-          cat.frame = (Math.floor(now / 260) % 2) ? "catGroomB" : "catGroomA";
-          if (now - cat.since > 2600) { setMode("sit"); cat.nextGroom = now + 3500 + Math.random() * 4000; }
+        case "bat": {
+          /* toy on the ledge, paw up, swat: off it goes */
+          if (at && at.ride) { cat.x = tx; cat.y = ty; }
+          if (!auto) { setMode("sit"); break; }
+          var tt = now - cat.since;
+          if (!auto.toy) { auto.toy = spawnToy(); holdToy(auto.toy); }
+          cat.frame = tt < 700 ? "catSit" : tt < 980 ? "catBatA" : "catBatB";
+          if (tt >= 980 && !auto.launched) {
+            auto.launched = true;
+            var toy = auto.toy;
+            toy.live = true; toy.vx = 0.13 + Math.random() * 0.05; toy.vy = -0.22;
+            auto.toy = null;
+            SFX.play("swat");
+            setTimeout(function () { SFX.play("plink"); }, 520);
+          }
+          if (tt > 1500) { auto.done = true; setMode("sit"); cat.nextGroom = now + 3000 + Math.random() * 3000; }
           break;
+        }
+        case "pounce": {
+          var pt = now - cat.since;
+          cat.frame = "catWalkB";
+          cat.hop = Math.round(Math.sin(Math.min(1, pt / 360) * Math.PI) * 16);
+          if (pt > 140 && auto && !auto.scared) { auto.scared = true; var sc = sceneApi(); if (sc) sc.scare(cat.x, cat.y - 40); }
+          if (pt > 380) {
+            if (!auto || ++auto.n >= 3) { stopAuto(); setMode("sit"); cat.nextGroom = now + 2500; break; }
+            auto.scared = false; auto.i = pickFly();
+            if (auto.i < 0) { stopAuto(); setMode("sit"); } else setMode("walk");
+          }
+          break;
+        }
       }
       if (petting && now - lastPet > 900) pet();
-      cat.x = clamp(cat.x, 30, vw - 30); cat.y = clamp(cat.y, 64, vh - 2);
+      cat.x = clamp(cat.x, 30, vw - 30); cat.y = clamp(cat.y, minY(), vh - 2);
+      stepToys(dt);
     }
 
     function loop(now) {
@@ -1620,6 +2130,7 @@
     function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
     function apply() {
       cv.style.display = enabled ? "" : "none";
+      if (!enabled) { stopAuto(); toys.forEach(function (t) { t.el.remove(); }); toys = []; }
       if (toggle) {
         toggle.setAttribute("aria-pressed", String(enabled));
         var st = $(".hud__cat-state", toggle); if (st) st.textContent = enabled ? "on" : "off";
@@ -1631,43 +2142,107 @@
     window.addEventListener("pointermove", function (e) {
       if (e.pointerType === "touch") return;
       pointer.x = e.clientX; pointer.y = e.clientY; pointer.t = performance.now(); pointer.moved = true;
+      if (auto) {
+        if (auto.px < 0) { auto.px = e.clientX; auto.py = e.clientY; }
+        else if (Math.hypot(e.clientX - auto.px, e.clientY - auto.py) > auto.tol) stopAuto();
+      }
       petting = inside(e.clientX, e.clientY) && (cat.mode === "sit" || cat.mode === "groom" || cat.mode === "sleep");
     }, { passive: true });
     window.addEventListener("pointerdown", function (e) {
       if (!enabled) return;
       if (inside(e.clientX, e.clientY)) { pet(); return; }
       if (e.pointerType === "touch" && !RM) {
+        stopAuto();
         pointer.moved = false;
-        target.x = clamp(e.clientX, 34, vw - 34); target.y = clamp(e.clientY + 24, 70, vh - 6);
+        target.x = clamp(e.clientX, 34, vw - 34); target.y = clamp(e.clientY + 24, minY(), vh - 6);
         pointer.t = performance.now(); pointer.x = e.clientX;
         if (cat.mode === "sleep") { setMode("alert"); fx("!", "", 0, -6); } else if (Math.hypot(target.x - cat.x, target.y - cat.y) > STOP + 26) setMode("walk");
       }
     }, { passive: true });
     doc.addEventListener("mouseleave", function () { petting = false; });
-    window.addEventListener("resize", function () { vw = window.innerWidth; vh = window.innerHeight; if (!pointer.moved) { target.y = vh - 10; cat.y = Math.min(cat.y, vh - 2); } });
+    window.addEventListener("resize", function () { measure(); if (!pointer.moved) { target.y = vh - 10; cat.y = Math.min(cat.y, vh - 2); } });
     doc.addEventListener("visibilitychange", function () { if (doc.hidden) stop(); else start(); });
+
+    /* jumped to an area from the HUD, a dialogue choice or the world map: trot over and sit on its heading */
+    doc.addEventListener("neko:goto", function (e) {
+      if (!enabled || RM || !e.detail || !e.detail.el) return;
+      var h = e.detail.el.matches("h1, h2") ? e.detail.el : $("h1, h2", e.detail.el);
+      if (h) startAuto("perch", { el: h, tol: 160 });
+    });
+    /* the gallery changed rooms */
+    doc.addEventListener("neko:carousel", function () {
+      if (!enabled || RM) return;
+      fx("!", "", 0, -6);
+      var g = $("[data-carousel]");
+      if (g) { var r = g.getBoundingClientRect(); cat.face = r.left + r.width / 2 < cat.x ? -1 : 1; }
+      if (cat.mode === "sleep" && !auto) { setMode("sit"); cat.nextGroom = performance.now() + 4000; }
+    });
 
     if (toggle) toggle.addEventListener("click", function () {
       enabled = !enabled;
       try { localStorage.setItem("neko-off", enabled ? "0" : "1"); } catch (e) { /* ignore */ }
       apply();
-      showBanner(enabled ? "Cat companion joined" : "Cat went home", enabled ? "Party update" : "Party update");
+      if (enabled) SFX.play("meow");
+      showBanner(enabled ? "Cat companion joined" : "Cat went home", "Party update");
     });
 
     /* secret: the classic code paints her ginger */
     var code = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"], pos = 0, ginger = false;
     doc.addEventListener("keydown", function (e) {
+      if (!e.key) return;
       pos = (e.key === code[pos] || e.key.toLowerCase() === code[pos]) ? pos + 1 : (e.key === code[0] ? 1 : 0);
       if (pos === code.length) {
         pos = 0; ginger = !ginger;
         var pal = Object.assign({}, PAL, ginger ? { b: "#d9822b", d: "#a8561c", h: "#f0a85a" } : {});
         buildFrames(pal); drawn = ""; paint(cat.frame);
+        SFX.play("chest");
         showBanner(ginger ? "Ginger cat unlocked" : "Back to midnight fur", "Secret found");
       }
     });
 
     paint(cat.frame);
     apply();
+  }
+
+  /* ---------------------------------------------------------
+     Sound toggle (HUD) + menu blips
+     --------------------------------------------------------- */
+  function initSound() {
+    var btns = $$(".hud__snd");
+    function apply() {
+      btns.forEach(function (b) {
+        b.setAttribute("aria-pressed", String(SFX.on));
+        var i = $(".spr", b);
+        if (i) { i.setAttribute("data-spr", SFX.on ? "sndOn" : "sndOff"); paintSprites(b); }
+        var st = $(".hud__snd-state", b); if (st) st.textContent = SFX.on ? "on" : "off";
+        b.title = SFX.on ? "Sound effects: on (click to mute)" : "Sound effects: off (click to turn on)";
+      });
+    }
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        SFX.set(!SFX.on);
+        apply();
+        SFX.play("toggle");
+        showBanner(SFX.on ? "Sound on" : "Sound off", "Settings");
+      });
+    });
+    apply();
+    /* a remembered "on" still waits for a real click or key press before any sound */
+    ["pointerdown", "keydown"].forEach(function (ev) { doc.addEventListener(ev, function () { SFX.unlock(); }, true); });
+
+    var SEL = ".hud__nav a, .hud__brand, .hud__menu, .hud__cat, .choice, .dlg__next, .node, .qtab, .pbtn, .inv-grid li, .travel a, .cv-link, .hd-toggle, .gallery__dots button, .skill__note a";
+    doc.addEventListener("pointerover", function (e) {
+      var t = e.target.closest && e.target.closest(SEL);
+      if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) SFX.play("blip");
+    });
+    doc.addEventListener("focusin", function (e) {
+      var t = e.target.closest && e.target.closest(SEL);
+      if (t && t.matches(":focus-visible")) SFX.play("blip");
+    });
+    doc.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest(SEL);
+      if (t && !t.matches(".node, [data-prev], [data-next], .pbtn[disabled]")) SFX.play("select");
+    });
   }
 
   /* ---------------------------------------------------------
@@ -1692,4 +2267,5 @@
   safe(initCampfire, "campfire");
   safe(initWorld, "world");
   safe(initCat, "cat");
+  safe(initSound, "sound");
 })();

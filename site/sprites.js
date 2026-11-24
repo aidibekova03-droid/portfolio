@@ -145,6 +145,59 @@
     "...kkkkkkkkkkkk....."
   ];
   S.catSleepB = S.catSleepA.slice(1, 14).concat([S.catSleepA[13], S.catSleepA[14], S.catSleepA[15]]);
+  /* batting at a toy: paw raised (A), then swiped down and out (B) */
+  S.catBatA = S.catSit.slice();
+  S.catBatA[9]  = ".kkkkbbbwwwbbbk.....";
+  S.catBatA[10] = "kwwkbbbbwwwbbbbk.kk.";
+  S.catBatA[11] = "kwwkbbbbbwbbbbbk.kbk";
+  S.catBatA[12] = ".kkkdbbbbbbbbbdk.kbk";
+  S.catBatA[13] = "...kdbbbbkwwkbdkkbk.";
+  S.catBatA[14] = "...kddbbbkwwkddbbk..";
+  S.catBatB = S.catSit.slice();
+  S.catBatB[10] = "kkkkbbbbwwwbbbbk.kk.";
+  S.catBatB[11] = "kwwkbbbbbwbbbbbk.kbk";
+  S.catBatB[12] = "kwwkdbbbbbbbbbdk.kbk";
+  S.catBatB[13] = "kkkkdbbbbkwwkbdkkbk.";
+  S.catBatB[14] = "...kddbbbkwwkddbbk..";
+
+  /* things she knocks off ledges */
+  S.toyMouse = [
+    "..kk.....",
+    ".kpkkkk..",
+    "kakaaaak.",
+    "kaaaaaakk",
+    ".kkkkkk.k"
+  ];
+  S.pebble = [
+    ".kkk.",
+    "kaaak",
+    "kAAAk",
+    ".kkk."
+  ];
+
+  /* HUD sound toggle: speaker with waves / speaker muted */
+  S.sndOn = [
+    "....kk......",
+    "...kwk....y.",
+    "kkkwwk.y...y",
+    "kwwwwk..y..y",
+    "kwwwwk..y..y",
+    "kwwwwk..y..y",
+    "kkkwwk.y...y",
+    "...kwk....y.",
+    "....kk......"
+  ];
+  S.sndOff = [
+    "....kk......",
+    "...kwk......",
+    "kkkwwk.r...r",
+    "kwwwwk..r.r.",
+    "kwwwwk...r..",
+    "kwwwwk..r.r.",
+    "kkkwwk.r...r",
+    "...kwk......",
+    "....kk......"
+  ];
 
   /* ---------- world-map landmarks 16x16 ---------- */
   S.house = [
