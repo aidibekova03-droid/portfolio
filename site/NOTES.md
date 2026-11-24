@@ -6,8 +6,20 @@
 - `index.html`: Village (hero + world map) → Quest Log (projects) → Gallery Dungeon (art) → Character Sheet (skills) → Notice Board (blog) → Campfire (footer)
 - `cv.html`: "Save File", a load-game style CV page with fast-travel links back to every section
 - `sprites.js`: every sprite as hand-written pixel strings (cat frames, landmarks, inventory items, icons, flames)
-- `main.js`: canvas scenes, cat AI, dialogue typing, carousel, tabs, inventory, nav
-- `style.css`: tokens, 9-slice pixel frames (inline SVG `border-image`), tiles, layouts
+- `main.js`: canvas scenes, the world painter, cat AI, dialogue typing, carousel, tabs, inventory, nav
+- `style.css`: tokens, 9-slice pixel frames (inline SVG `border-image`), tiles (no-JS fallback), layouts
+
+## One continuous world (refinement 1)
+Below the hero, every area sits on one painted ground (`initWorld` in `main.js`): a single canvas behind the page from the world map to the campfire, drawn at the world map's 3px art pixel with the map's pine sprite, path colours and ink outline. The journey follows the map's order:
+- **Village** grass around the world map → a **treeline** seam → **Quest Log** on the forest floor, pines filling the margins.
+- **Cliff** seam: mossy boulder cliff with a cut-stone **cave arch** and a crystal keystone → **Gallery Dungeon** inside the cave (rubble floor, boulder walls in the margins, existing torches).
+- **Stone steps** seam: the cave mouth opens onto steps that lighten towards the moonlight → **Character Sheet** in a moonlit clearing (dithered moon pool, moon-tinted pines).
+- **Fence and gate** seam (lantern-capped gate posts, flower beds, a cottage in the right margin) → **Notice Board** on a cobbled village square flanked by two lamps.
+- **Night treeline** seam → **Campfire** ground with a dithered firelight pool under the fire.
+- The ground gets darker as you go deeper, apart from the moonlit clearing and lamp-lit square, so the scroll reads as one walk through the night.
+- **The trail** from the world map continues down the left margin (dirt, flagstones in the cave, cut steps through rock) with a small clearing beside every area name. A sticky "You are here" pin rides it at mid-screen. It only shows when the margin is at least about 100px wide (viewports of about 1380px and up); narrower screens keep the seams and biomes.
+- Each area's `--seam` CSS variable sets the strip height. The painter reads it, so spacing and art stay in sync.
+- `cv.html` (Save File) uses the same painter: the moonlit clearing dithers in from the hero's meadow, matching the Character Sheet.
 
 ## Palette
 | Token | Hex | Use |
@@ -22,7 +34,9 @@
 | Parchment | `#d6c49a` | box shading |
 | Wood | `#6b4423` / `#3b2618` | Quest Log floor, notice board |
 | Berry | `#c4503f` | menu cursor, stamps, pins |
-| Crystal | `#69dccb` | save point, career-direction state |
+| Crystal | `#69dccb` | save point, career-direction state, cave keystone |
+
+World ground ramp (darker with depth): village `#1f4d2e` → forest `#1a412b` → cave `#122326` (boulders `#2e4447`/`#1b2c2f`) → moonlit clearing `#163b36` → village square `#22502f` (cobbles `#4a5646`) → camp `#11261f`. Trail dirt `#b89a5e`/`#6f5a32`, as on the map.
 
 ## Fonts
 - **Silkscreen** for h1/h2 only (area names)
@@ -42,6 +56,7 @@ None. Vanilla JS and canvas only, so the page runs from `file://` and has no CDN
 - Character Sheet: big skill names with quest-state chips (In practice: a blinking dot; Learning: cycling pips; Career direction: a diamond), plus an inventory grid with a roving tab index, arrow-key navigation, and a description window.
 - Area banner ("Now entering · Gallery Dungeon") slides in as you scroll into each area, and the HUD menu cursor follows the active area.
 - Campfire footer: a canvas fire with logs and rising embers.
+- The world ground is painted once, never animated. The first paint waits for web fonts and an idle moment (`requestIdleCallback`), so it never lands on the intro. It repaints only when the layout changes (`ResizeObserver`, debounced). The "You are here" pin uses CSS `position: sticky`, so it needs no scroll handler.
 
 ## The cat
 An original tuxedo cat, drawn from my own sprite data with midnight fur, green eyes and a green collar with a lantern bell. A cream halo keeps her readable on dark backgrounds.
@@ -67,3 +82,4 @@ Skip link, landmarks, one h1 per page, a visible lantern-yellow focus ring, ARIA
 - The pixelated portrait can't be colour-quantised, because canvas pixels can't be read under `file://` (tainted canvas). It is downsampled only, and a cream multiply blend replaces the white background.
 - The cat lives in viewport space (`position: fixed`). In full-page screenshots she shows up wherever the viewport bottom was at capture time.
 - Silkscreen is a caps-style face, so it is limited to area headings.
+- The world paint is a one-off main-thread task of about 50 to 130ms in headless Chrome (about 1M art pixels at 1440). It runs at idle and again only on layout change. Without JS, the per-area CSS tiles and edges remain as a simpler fallback.

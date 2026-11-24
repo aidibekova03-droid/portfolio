@@ -570,5 +570,20 @@
     "kk...kk"
   ];
 
+  /* "you are here" map pin, 9x11 */
+  S.pin = [
+    "..kkkkk..",
+    ".kyyyyyk.",
+    "kyzyyyyYk",
+    "kyykkkyYk",
+    "kyykwkyYk",
+    "kyykkkyYk",
+    ".kyyyyYk.",
+    "..kyyYk..",
+    "..kyYYk..",
+    "...kYk...",
+    "....k...."
+  ];
+
   root.SPR = { PAL: PAL, S: S };
 })(typeof window !== "undefined" ? window : globalThis);

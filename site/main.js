@@ -525,6 +525,517 @@
   }
 
   /* ---------------------------------------------------------
+     The world: one continuous pixel ground painted behind every area,
+     from the world map down to the campfire. Same 3px art pixel, pine
+     sprite, path colours and ink outline as the world map. Painted once
+     per layout (no loop); the CSS tiles stay as the no-JS fallback.
+     --------------------------------------------------------- */
+  function ih(x, y) {
+    var n = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function initWorld() {
+    var PX = 3;
+    var isCV = !!$(".page-cv");
+    var cfg = isCV
+      ? { start: "#main", end: ".cv-foot", wrap: "#main", zones: [{ sel: "#main", biome: "clearing", blend: "village" }] }
+      : { start: "#map", end: "#contact", wrap: "#projects .wrap", trail: true, zones: [
+          { sel: "#map", biome: "village" },
+          { sel: "#projects", biome: "forest", seam: "treeline" },
+          { sel: "#art", biome: "cave", seam: "cliff" },
+          { sel: "#skills", biome: "clearing", seam: "steps" },
+          { sel: "#blog", biome: "square", seam: "fence" },
+          { sel: "#contact", biome: "camp", seam: "nightpines" }
+        ] };
+    var startEl = $(cfg.start), endEl = $(cfg.end), wrapEl = $(cfg.wrap);
+    if (!startEl || !endEl || !wrapEl) return;
+
+    var RGB = {};
+    function C(h) { return RGB[h] || (RGB[h] = hex(h)); }
+    var BIO = {
+      village:  { g: "#1f4d2e", p: "#24552f", t: "#2b6136", d: "#183f26", fl: ["#f5c451", "#ea9aa9", "#f4ead0"], fr: 0.004, path: ["#b89a5e", "#a08348", "#6f5a32"] },
+      forest:   { g: "#1a412b", p: "#1e4830", t: "#245433", d: "#133322", fl: ["#b9d86a", "#6b5a34"], fr: 0.003, path: ["#a68a54", "#8f7442", "#5c4a2a"] },
+      cave:     { g: "#122326", p: "#15292c", t: "#1b3235", d: "#0a1416", fl: ["#2a8a80", "#69dccb"], fr: 0.0012, path: ["#3d5355", "#33484b", "#0e181a"], stone: true },
+      clearing: { g: "#163b36", p: "#1a443e", t: "#21524a", d: "#10302b", fl: ["#69dccb", "#9fc2b4", "#b9d86a"], fr: 0.003, path: ["#9b9273", "#847c60", "#4e4a38"], moon: true },
+      square:   { g: "#22502f", p: "#265834", t: "#2e643a", d: "#1a4227", fl: ["#f5c451", "#ea9aa9", "#f4ead0"], fr: 0.0045, path: ["#b89a5e", "#a08348", "#6f5a32"] },
+      camp:     { g: "#11261f", p: "#142c24", t: "#1a342a", d: "#0b1a16", fl: ["#3b5a3a", "#5d6866"], fr: 0.003, path: ["#6f5d3c", "#5e4f33", "#3a301f"] }
+    };
+    Object.keys(BIO).forEach(function (k) {
+      var b = BIO[k];
+      ["g", "p", "t", "d"].forEach(function (c) { b[c] = C(b[c]); });
+      b.fl = b.fl.map(C); b.path = b.path.map(C);
+    });
+    var PINE_PAL = {
+      forest: null, village: null,
+      clearing: { m: "#7fb8a0", g: "#3f7f6a", G: "#235448", L: "#3b2618" },
+      camp: { m: "#4f7a4a", g: "#2a5a34", G: "#183d27", L: "#2b1c12" }
+    };
+    var INK = C("#120f17"), ROCK_INK = C("#0b1416");
+    var ROCK_DARK = { base: [C("#1b2c2f"), C("#1e3134"), C("#18282a")], hi: C("#26393b"), sh: C("#132123"), mo: C("#0b1517") };
+    var ROCK_LIT = { base: [C("#2e4447"), C("#33494c"), C("#2a3e41")], hi: C("#45605f"), sh: C("#1f3134"), mo: C("#101b1d") };
+
+    var box = doc.createElement("div");
+    box.className = "world"; box.setAttribute("aria-hidden", "true");
+    var cv = doc.createElement("canvas");
+    box.appendChild(cv);
+    doc.body.insertBefore(box, doc.body.firstChild);
+    var ctx = cv.getContext("2d");
+    var trailEl = $(".trail");
+    var lastKey = "";
+
+    function paint() {
+      var sy = window.pageYOffset || 0;
+      var top0 = Math.round(startEl.getBoundingClientRect().top + sy);
+      var end = Math.round(endEl.getBoundingClientRect().bottom + sy);
+      var cw = root.clientWidth;
+      var W = Math.ceil(cw / PX), H = Math.ceil((end - top0) / PX);
+      if (W < 20 || H < 20) return;
+      var zones = cfg.zones.map(function (z) {
+        var el = $(z.sel);
+        var seam = el ? parseFloat(getComputedStyle(el).getPropertyValue("--seam")) || 0 : 0;
+        return { b: BIO[z.biome], name: z.biome, seam: z.seam, blend: z.blend ? BIO[z.blend] : null,
+                 top: el ? Math.round((el.getBoundingClientRect().top + sy - top0) / PX) : 0, sh: Math.round(seam / PX) };
+      });
+      zones.forEach(function (z, i) { z.bot = i < zones.length - 1 ? zones[i + 1].top : H; });
+      var wr = wrapEl.getBoundingClientRect(), ws = getComputedStyle(wrapEl);
+      var cl = Math.floor((wr.left + parseFloat(ws.paddingLeft)) / PX);
+      var cr = Math.ceil((wr.right - parseFloat(ws.paddingRight)) / PX);
+      var key = [W, H, cl].concat(zones.map(function (z) { return z.top + ":" + z.sh; })).join(",");
+      if (key === lastKey) return;
+      lastKey = key;
+
+      cv.width = W; cv.height = H;
+      cv.style.width = (W * PX) + "px"; cv.style.height = (H * PX) + "px";
+      box.style.top = top0 + "px"; box.style.height = (end - top0) + "px";
+
+      var img = ctx.createImageData(W, H), D = img.data;
+      function set(x, y, c) {
+        if (x < 0 || y < 0 || x >= W || y >= H) return;
+        var k = (y * W + x) * 4; D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = 255;
+      }
+      function get(x, y) { var k = (y * W + x) * 4; return [D[k], D[k + 1], D[k + 2]]; }
+      function mix(a, b, t) { return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
+
+      var cx = W >> 1;
+      var trailOn = !!cfg.trail && cl >= 34;
+      var tx0 = cl - 17;
+      function tX(y) { return tx0 + Math.round(1.6 * Math.sin(y * 0.05) + 0.8 * Math.sin(y * 0.13 + 1)); }
+
+      /* value noise for soft meadow patches */
+      var G = 9, gw = Math.ceil(W / G) + 2, gh = Math.ceil(H / G) + 2, grid = new Float32Array(gw * gh);
+      for (var gi = 0; gi < grid.length; gi++) grid[gi] = ih(gi, 4242);
+      var nX0 = new Int32Array(W), nFX = new Float32Array(W), nRow = new Float32Array(gw), nRowY = -1;
+      for (var nx = 0; nx < W; nx++) { var gxx = nx / G; nX0[nx] = Math.floor(gxx); var f0 = gxx - nX0[nx]; nFX[nx] = f0 * f0 * (3 - 2 * f0); }
+      function noiseRow(y) {
+        if (y === nRowY) return;
+        nRowY = y;
+        var gy = y / G, y0 = Math.floor(gy), fy = gy - y0;
+        fy = fy * fy * (3 - 2 * fy);
+        for (var i = 0; i < gw; i++) nRow[i] = grid[y0 * gw + i] * (1 - fy) + grid[(y0 + 1) * gw + i] * fy;
+      }
+      function noise(x) { var x0 = nX0[x], f = nFX[x]; return nRow[x0] * (1 - f) + nRow[x0 + 1] * f; }
+      /* boulders: jittered-cell (Voronoi) stones, lit from above */
+      var cellCache = {};
+      function cells(seed, sx, sy) {
+        var key2 = seed + ":" + sx + ":" + sy;
+        if (cellCache[key2]) return cellCache[key2];
+        var cols = Math.ceil(W / sx) + 3, rows = Math.ceil(H / sy) + 3, ax = new Float32Array(cols * rows), ay = new Float32Array(cols * rows);
+        for (var r = 0; r < rows; r++) for (var q = 0; q < cols; q++) {
+          var qx = q - 1, qy = r - 1;
+          ax[r * cols + q] = (qx + 0.2 + ih(qx, qy * 7 + seed) * 0.6) * sx;
+          ay[r * cols + q] = (qy + 0.2 + ih(qx * 3 + seed, qy) * 0.6) * sy;
+        }
+        return (cellCache[key2] = { cols: cols, ax: ax, ay: ay });
+      }
+      function rockAt(x, y, seed, sx, sy) {
+        sx = sx || 11; sy = sy || 8;
+        var cc = cells(seed, sx, sy);
+        var gx = Math.floor(x / sx), gy = Math.floor(y / sy), f1 = 1e9, f2 = 1e9, id = 0, py = 0;
+        for (var j = -1; j <= 1; j++) for (var i = -1; i <= 1; i++) {
+          var qx = gx + i, qy = gy + j, ci = (qy + 1) * cc.cols + qx + 1;
+          var cxp = cc.ax[ci], cyp = cc.ay[ci];
+          var ddx = x + 0.5 - cxp, ddy = (y + 0.5 - cyp) * 1.25, d = ddx * ddx + ddy * ddy;
+          if (d < f1) { f2 = f1; f1 = d; id = qx * 9176 + qy; py = cyp; } else if (d < f2) f2 = d;
+        }
+        var e = Math.sqrt(f2) - Math.sqrt(f1);
+        if (e < 1.1) return -1;
+        if (e < 2.3 && y + 0.5 > py) return -3;
+        if (y + 0.5 - py < -sy * 0.2 && e > 1.6) return -2;
+        var v = ih(id, seed);
+        return v < 0.4 ? 0 : v < 0.75 ? 1 : 2;
+      }
+      function rockCol(pal, code) { return code === -1 ? pal.mo : code === -2 ? pal.hi : code === -3 ? pal.sh : pal.base[code]; }
+
+      /* biome at a pixel: inside a seam the two neighbours dither together */
+      function zoneAt(y) { for (var i = zones.length - 1; i >= 0; i--) if (y >= zones[i].top) return i; return 0; }
+      function biomeAt(x, y, zi) {
+        var z = zones[zi];
+        var prev = zi > 0 ? zones[zi - 1].b : z.blend;
+        if (!prev) return z.b;
+        var span = z.sh || 14;
+        if (y >= z.top + span) return z.b;
+        var t = clamp(((y - z.top) / span - 0.2) / 0.6, 0, 1);
+        return t > bayer(x, y) ? z.b : prev;
+      }
+
+      /* ---- 1. ground ---- */
+      var nCells = (W >> 3) + 1, tuftX = new Int32Array(nCells), tuftY = new Int32Array(nCells), cellRow = -1;
+      for (var y = 0; y < H; y++) {
+        var zi = zoneAt(y), z = zones[zi];
+        noiseRow(y);
+        var rowB = (zi > 0 || z.blend) && y < z.top + (z.sh || 14) ? null : z.b;
+        if ((y >> 3) !== cellRow) {
+          cellRow = y >> 3;
+          for (var tc = 0; tc < nCells; tc++) {
+            tuftY[tc] = ih(tc, cellRow + 913) < 0.5 ? (cellRow << 3) + 1 + Math.floor(ih(tc + 5, cellRow) * 5) : -1;
+            tuftX[tc] = (tc << 3) + 1 + Math.floor(ih(tc, cellRow + 77) * 6);
+          }
+        }
+        for (var x = 0; x < W; x++) {
+          var b = rowB || biomeAt(x, y, zi), c, h = ih(x, y);
+          {
+            c = b.g;
+            var nz = noise(x);
+            var by = BAYER[((y & 3) << 2) + (x & 3)];
+            if (nz > 0.6 && by < (nz - 0.55) * 3) c = b.p;
+            if (b.moon && z.b === b) {
+              var mh = z.bot - z.top - z.sh, my = z.top + z.sh + mh * 0.38;
+              var mdx = (x - cx) / (W * 0.48), mdy = (y - my) / (mh * 0.46 + 1), md = Math.sqrt(mdx * mdx + mdy * mdy);
+              if (md < 1 && (1 - md) * 0.75 > by) c = c === b.p ? b.t : b.p;
+            }
+            var ccx = x >> 3, oy = tuftY[ccx];
+            if (oy >= 0 && (y === oy || y === oy + 1)) {
+              var ox = tuftX[ccx];
+              if ((x === ox && y === oy) || (y === oy + 1 && (x === ox - 1 || x === ox + 1))) c = b.t;
+            }
+            if (h < 0.035) c = b.d;
+            if (h > 1 - b.fr) c = b.fl[Math.floor(ih(y, x) * b.fl.length)];
+          }
+          var k = (y * W + x) * 4;
+          D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = 255;
+        }
+      }
+
+      /* ---- 2. light pools (lamps, campfire) ---- */
+      function glow(gx, gy, rx, ry, cols, strength) {
+        for (var yy = Math.floor(gy - ry); yy <= gy + ry; yy++) for (var xx = Math.floor(gx - rx); xx <= gx + rx; xx++) {
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          var ex = (xx - gx) / rx, ey = (yy - gy) / ry, d = Math.sqrt(ex * ex + ey * ey);
+          if (d >= 1 || (1 - d) * strength < bayer(xx, yy)) continue;
+          set(xx, yy, d < 0.35 ? cols[0] : d < 0.7 ? cols[1] : cols[2]);
+        }
+      }
+      var lamps = [], houses = [], trees = [];
+      zones.forEach(function (z) {
+        if (z.name === "square") {
+          /* a cobbled village square under the notice board */
+          var planks = $(".board__planks");
+          if (planks) {
+            var br = planks.getBoundingClientRect();
+            var pcx = (br.left + br.width / 2) / PX, pcy = (br.top + br.height / 2 + 24 + sy - top0) / PX;
+            var prx = br.width / 2 / PX + 18, pry = br.height / 2 / PX + 22;
+            var COB = { base: [C("#4a5646"), C("#515d4c"), C("#465142")], hi: C("#66735d"), sh: C("#3a4539"), mo: C("#283126") };
+            for (var qy = Math.floor(pcy - pry); qy <= pcy + pry; qy++) for (var qx = Math.floor(pcx - prx); qx <= pcx + prx; qx++) {
+              if (qx < 0 || qy < 0 || qx >= W || qy >= H) continue;
+              var pex = (qx - pcx) / prx, pey = (qy - pcy) / pry, pd = Math.sqrt(pex * pex + pey * pey);
+              if (pd > 1 || (pd > 0.9 && (pd - 0.9) * 10 > bayer(qx, qy))) continue;
+              set(qx, qy, rockCol(COB, rockAt(qx, qy, 21, 5, 4)));
+            }
+            lamps.push([Math.round(pcx - prx + 7), Math.round(pcy - pry * 0.45)]);
+            lamps.push([Math.round(pcx + prx - 7), Math.round(pcy - pry * 0.45)]);
+          }
+          if (W - cr >= 22) houses.push([cr + Math.round((W - cr) / 2) - 8, z.top + Math.round(z.sh * 0.16)]);
+          lamps.forEach(function (l) { glow(l[0], l[1] + 1, 18, 10, [C("#5f6a34"), C("#46622f"), C("#2f5a33")], 0.9); });
+        }
+        if (z.name === "camp") {
+          var fire = $(".campfire");
+          if (fire) {
+            var fr = fire.getBoundingClientRect();
+            var fxp = Math.round((fr.left + fr.width / 2) / PX), fyp = Math.round((fr.bottom + sy - top0) / PX) - 2;
+            glow(fxp, fyp, 70, 30, [C("#3a3418"), C("#2a2c1a"), C("#1a2a1e")], 0.85);
+          }
+        }
+      });
+
+      /* ---- 3. the trail, continued from the world map ---- */
+      if (trailOn) {
+        for (var ty = 0; ty < H; ty++) {
+          var tzi = zoneAt(ty), tx = tX(ty), tb = biomeAt(tx, ty, tzi);
+          for (var dx = -2; dx <= 2; dx++) {
+            var col;
+            if (Math.abs(dx) === 2) col = tb.path[2];
+            else if (tb.stone) col = ty % 4 === 0 ? tb.path[2] : ty % 4 === 1 ? tb.path[1] : tb.path[0];
+            else col = ih(tx + dx, ty) < 0.12 ? tb.path[1] : tb.path[0];
+            set(tx + dx, ty, col);
+          }
+          if (!tb.stone && ty % 14 === 6) set(tx + ((ty / 14) % 2 ? 1 : -1), ty, tb.path[1]);
+        }
+        /* a clearing on the trail beside every area name, like the map's landmarks */
+        $$(".area-head__icon").forEach(function (ic) {
+          var r = ic.getBoundingClientRect();
+          var ny = Math.round((r.top + r.height / 2 + sy - top0) / PX);
+          if (ny < 4 || ny > H - 4) return;
+          var nx = tX(ny), nb = biomeAt(nx, ny, zoneAt(ny));
+          for (var yy = -5; yy <= 5; yy++) for (var xx = -8; xx <= 8; xx++) {
+            var e = Math.hypot(xx / 7.5, yy / 4.5);
+            if (e <= 0.82) set(nx + xx, ny + yy, ih(nx + xx, ny + yy) < 0.12 ? nb.path[1] : nb.path[0]);
+            else if (e <= 1) set(nx + xx, ny + yy, nb.path[2]);
+          }
+        });
+      }
+
+      /* ---- 4. seams between areas ---- */
+      var carve = new Uint8Array(H);
+      function outlineFill(x0, y0, x1, y1, inside, colour, ink) {
+        var w = x1 - x0, hgt = y1 - y0;
+        if (w <= 0 || hgt <= 0) return null;
+        var m = new Uint8Array(w * hgt);
+        for (var yy = 0; yy < hgt; yy++) for (var xx = 0; xx < w; xx++) if (inside(x0 + xx, y0 + yy)) m[yy * w + xx] = 1;
+        function at(xx, yy) { return xx < 0 || yy < 0 || xx >= w || yy >= hgt ? 1 : m[yy * w + xx]; }
+        for (var y2 = 0; y2 < hgt; y2++) for (var x2 = 0; x2 < w; x2++) {
+          if (!m[y2 * w + x2]) continue;
+          var edge = !at(x2 - 1, y2) || !at(x2 + 1, y2) || !at(x2, y2 - 1) || !at(x2, y2 + 1);
+          set(x0 + x2, y0 + y2, edge ? ink : colour(x0 + x2, y0 + y2));
+        }
+        return function (x, y) { var xx = x - x0, yy = y - y0; return xx >= 0 && yy >= 0 && xx < w && yy < hgt && m[yy * w + xx] === 1; };
+      }
+
+      function treeRow(z, rows, pal) {
+        for (var r = 0; r < rows; r++) {
+          var base = z.top + 11 + Math.round(r * (z.sh - 18) / Math.max(1, rows - 1));
+          for (var x = -3 + (r % 2) * 3; x < W + 4; x += 4 + Math.floor(ih(x, r + 51) * 3)) {
+            var ty = base + Math.floor(ih(x, r + 7) * 4);
+            if (trailOn && Math.abs(x - tX(ty)) < 7) continue;
+            if (ih(x, r + 99) < 0.12) continue;
+            trees.push([x, ty, pal]);
+          }
+        }
+      }
+      function marginTrees(z, density, pal) {
+        var y0 = z.top + z.sh + 4, y1 = z.bot - 6;
+        for (var y = y0; y < y1; y += 4) for (var x = 1; x < W; x += 5) {
+          if (ih(x, y + 313) > density) continue;
+          var px2 = x + Math.floor(ih(y, x) * 3) - 1, py2 = y + Math.floor(ih(x, y) * 3);
+          if (px2 + 5 > cl - 2 && px2 - 5 < cr + 2) continue;
+          if (trailOn && Math.abs(px2 - tX(py2)) < 8) continue;
+          trees.push([px2, py2, pal]);
+        }
+      }
+
+      var cave = null;
+      zones.forEach(function (z, zi) {
+        if (z.name === "village" || z.name === "forest") marginTrees(z, z.name === "forest" ? 0.42 : 0.16, null);
+        if (z.name === "clearing" && !isCV) marginTrees(z, 0.1, PINE_PAL.clearing);
+        if (z.name === "camp") marginTrees(z, 0.12, PINE_PAL.camp);
+        if (z.seam === "treeline") treeRow(z, 4, null);
+        if (z.seam === "nightpines") treeRow(z, 4, PINE_PAL.camp);
+        if (z.seam === "cliff") cave = { z: z, exit: zones[zi + 1] && zones[zi + 1].seam === "steps" ? zones[zi + 1] : null };
+        if (z.seam === "fence") {
+          var yf = z.top + Math.round(z.sh * 0.62);
+          var gate = trailOn ? tX(yf) : cx;
+          outlineFill(0, yf - 14, W, yf + 1, function (x, y) {
+            var g = Math.abs(x - gate);
+            if (g < 6) return false;
+            var post = ((x + 400) % 11) < 3 || (g >= 6 && g <= 8);
+            if (post) return y >= yf - (g <= 8 ? 14 : 11);
+            return (y >= yf - 9 && y <= yf - 7) || (y >= yf - 4 && y <= yf - 2);
+          }, function (x, y) {
+            var g = Math.abs(x - gate);
+            if (g <= 8 && y <= yf - 12) return y === yf - 13 && g === 7 ? C("#fff3a6") : C("#f5c451");
+            var post = ((x + 400) % 11) < 3 || (g >= 6 && g <= 8);
+            if (post) return ((x + 400) % 11) === 0 || g === 6 ? C("#b07a43") : ((x + 400) % 11) === 2 || g === 8 ? C("#3b2618") : C("#6b4423");
+            return y === yf - 8 || y === yf - 3 ? C("#b07a43") : C("#6b4423");
+          }, INK);
+          /* flower beds along the fence */
+          for (var fx = 0; fx < W; fx++) {
+            if (Math.abs(fx - gate) < 8) continue;
+            if (ih(fx, 777) < 0.3) set(fx, yf + 1, C("#163a22"));
+            if (ih(fx, 778) < 0.12) set(fx, yf + 1 + Math.floor(ih(fx, 779) * 2), [C("#f5c451"), C("#ea9aa9"), C("#f4ead0")][Math.floor(ih(fx, 780) * 3)]);
+          }
+        }
+      });
+
+      /* the cave: cliff with a keystone arch, rock walls, stone steps out */
+      if (cave) {
+        var cz = cave.z, ez = cave.exit;
+        var y0 = cz.top, y1 = cz.top + cz.sh;
+        var a = Math.round(Math.min(W * 0.34, 150)), hc = Math.min(Math.round(a * 0.42), cz.sh - 24), yA = y0 + 16;
+        var a2 = Math.round(Math.min(W * 0.3, 128));
+        var wallL = trailOn ? tx0 - 7 : cl - 6;
+        var wallR = W - 1 - wallL;
+        var hasWalls = wallL >= 3;
+        var yEnd = ez ? ez.top + ez.sh : cz.bot;
+        function hw(y, A, Hh, apex) {
+          if (y < apex) return -1;
+          var yc = apex + Hh;
+          if (y >= yc) return A;
+          var t = (yc - y) / Hh;
+          return A * Math.sqrt(1 - t * t);
+        }
+        function cliffTop(x) { return y0 + 6 + (ih(x >> 1, 501) < 0.5 ? 0 : 1); }
+        function exitBot(x) { return yEnd - 4 - Math.floor(ih(x >> 1, 602) * 5); }
+        function inRock(x, y) {
+          if (y < y1) {
+            if (y < cliffTop(x)) return false;
+            return Math.abs(x + 0.5 - cx) > hw(y, a + 6, hc + 6, yA - 6);
+          }
+          if (ez && y >= ez.top) {
+            if (y >= exitBot(x)) return false;
+            var jag = Math.floor(ih(y >> 1, 601) * 3);
+            if (Math.abs(x + 0.5 - cx) > a2 + jag + (y < ez.top + 3 ? 2 : 0)) return true;
+          }
+          if (!hasWalls) return false;
+          var wj = Math.round(1.5 * Math.sin(y * 0.09) + ih(y >> 2, 7) * 2);
+          return x < wallL + wj || x > wallR - wj;
+        }
+        /* opening + stairs first, so the rock overlaps their ends */
+        for (var oy = yA; oy < y1; oy++) {
+          var half = hw(oy, a, hc, yA);
+          var t = (oy - yA) / (y1 - yA);
+          for (var ox = Math.floor(cx - half); ox <= cx + half; ox++) {
+            if (Math.abs(ox + 0.5 - cx) > half) continue;
+            if (t > 0.55 && (t - 0.55) * 2.4 > bayer(ox, oy)) continue;
+            set(ox, oy, t < 0.25 ? C("#050b0d") : C("#081316"));
+          }
+        }
+        if (ez) {
+          var ys0 = ez.top + 4, n = 5, hs = Math.max(4, Math.floor((ez.sh - 14) / n));
+          var c0 = C("#1b2d30"), c1 = C("#5e837b");
+          for (var i = 0; i < n; i++) {
+            var sc = mix(c0, c1, i / (n - 1)), hi = mix(sc, C("#9fc2b4"), 0.35), lo = mix(sc, C("#0b1416"), 0.45);
+            var sw2 = a2 + 4 - (n - 1 - i) * 2;
+            for (var s = 0; s < hs; s++) {
+              var yy = ys0 + i * hs + s;
+              for (var sx = cx - sw2; sx <= cx + sw2; sx++) {
+                var cc = s === hs - 1 ? ROCK_INK : s === 0 ? hi : s >= hs - 2 ? lo : sc;
+                if (Math.abs(sx - cx) === sw2) cc = ROCK_INK;
+                if (s > 0 && s < hs - 2 && i > 1 && ih(sx, yy) < 0.04) cc = C("#2f6b34");
+                set(sx, yy, cc);
+              }
+            }
+          }
+        }
+        var isRock = outlineFill(0, y0, W, yEnd, inRock, function (x, y) {
+          var lit;
+          if (y < y1) lit = 1;
+          else if (ez && y >= ez.top) lit = (y - ez.top) / ez.sh * 0.8;
+          else lit = 0;
+          return rockCol(lit > bayer(x, y) ? ROCK_LIT : ROCK_DARK, rockAt(x, y, 11));
+        }, ROCK_INK);
+        /* grass lip and moss drips on top of the cliff */
+        for (var gx = 0; gx < W; gx++) {
+          var top = cliffTop(gx);
+          if (!isRock(gx, top)) continue;
+          set(gx, top, ih(gx, 502) < 0.7 ? C("#2f6b34") : ROCK_INK);
+          if (ih(gx, 505) < 0.35) set(gx, top - 1, C("#62a447"));
+          if (ih(gx, 503) < 0.14) {
+            var len = 1 + Math.floor(ih(gx, 504) * 5);
+            for (var k2 = 1; k2 <= len; k2++) if (isRock(gx, top + k2)) set(gx, top + k2, k2 === len ? C("#1f4d2e") : C("#2f6b34"));
+          }
+        }
+        /* cast shadow under the cliff */
+        for (var shy = y1; shy < y1 + 5; shy++) for (var shx = 0; shx < W; shx++) {
+          if (isRock(shx, shy) || Math.abs(shx + 0.5 - cx) <= a) continue;
+          if ((y1 + 5 - shy) / 6 > bayer(shx, shy)) set(shx, shy, C("#070f11"));
+        }
+        /* the arch: cut voussoirs with a crystal keystone */
+        var nSeg = 15;
+        outlineFill(cx - a - 8, yA - 7, cx + a + 9, y1, function (x, y) {
+          var d = Math.abs(x + 0.5 - cx);
+          return d > hw(y, a, hc, yA) && d <= hw(y, a + 6, hc + 6, yA - 6);
+        }, function (x, y) {
+          var yc = yA + hc, joint, seg;
+          if (y < yc) {
+            var ang = Math.atan2((yc - y) / (hc + 3), (x + 0.5 - cx) / (a + 3)) / Math.PI * nSeg;
+            seg = Math.floor(ang); joint = ang - seg < 0.1;
+          } else { seg = 40 + Math.floor((y - yc) / 6) * 2 + (x < cx ? 0 : 1); joint = (y - yc) % 6 === 5; }
+          if (joint) return ROCK_INK;
+          var dIn = Math.abs(x + 0.5 - cx) - hw(y, a, hc, yA);
+          var dOut = hw(y, a + 6, hc + 6, yA - 6) - Math.abs(x + 0.5 - cx);
+          if (dIn < 1.6) return C("#2e4446");
+          if (dOut < 1.6 && y < yc) return C("#8fa9a3");
+          return ih(seg, 9) < 0.5 ? C("#6a8682") : C("#5f7a77");
+        }, ROCK_INK);
+        outlineFill(cx - 6, yA - 10, cx + 7, yA + 4, function (x, y) {
+          return !(y > yA && Math.abs(x + 0.5 - cx) > 4.5 - (y - yA));
+        }, function (x, y) {
+          var gx2 = x - cx, gy2 = y - (yA - 3);
+          if (Math.abs(gx2) + Math.abs(gy2) <= 2) return gx2 + gy2 < -1 ? C("#c8fff6") : (gx2 + gy2 > 0 ? C("#2a8a80") : C("#69dccb"));
+          return y === yA - 9 ? C("#b3cbc4") : x === cx + 5 ? C("#56716f") : C("#8fa9a3");
+        }, ROCK_INK);
+        /* the trail climbs through the rock on cut steps */
+        if (trailOn) for (var ry = y0; ry < yEnd; ry++) if (isRock(tX(ry), ry)) carve[ry] = 1;
+      }
+
+      if (trailOn) {
+        for (var cy2 = 0; cy2 < H; cy2++) {
+          if (!carve[cy2]) continue;
+          var tx3 = tX(cy2), ph = cy2 % 3;
+          for (var dx3 = -3; dx3 <= 3; dx3++) {
+            var c3 = Math.abs(dx3) === 3 ? ROCK_INK : ph === 0 ? C("#7d918c") : ph === 1 ? C("#56696a") : ROCK_INK;
+            set(tx3 + dx3, cy2, c3);
+          }
+        }
+      }
+
+      ctx.putImageData(img, 0, 0);
+
+      /* ---- 5. sprites: pines (the world map's own), cottages, lamps ---- */
+      trees.sort(function (p, q) { return p[1] - q[1]; });
+      var pineCache = [];
+      function pineImg(pal) {
+        for (var i = 0; i < pineCache.length; i++) if (pineCache[i][0] === pal) return pineCache[i][1];
+        var pc = doc.createElement("canvas"); pc.width = S.pine[0].length; pc.height = S.pine.length;
+        drawSprite(pc.getContext("2d"), S.pine, 0, 0, 1, pal ? { pal: Object.assign({}, PAL, pal) } : null);
+        pineCache.push([pal, pc]);
+        return pc;
+      }
+      trees.forEach(function (t) {
+        var under = get(clamp(t[0], 0, W - 1), clamp(t[1], 0, H - 1));
+        ctx.fillStyle = "rgb(" + mix(under, [6, 14, 10], 0.45).join(",") + ")";
+        ctx.fillRect(t[0] - 3, t[1] - 1, 7, 2);
+        ctx.drawImage(pineImg(t[2]), t[0] - 3, t[1] - 10);
+      });
+      houses.forEach(function (hh) { if (S.house) drawSprite(ctx, S.house, hh[0], hh[1], 1); });
+      lamps.forEach(function (l) {
+        ctx.fillStyle = "#120f17";
+        ctx.fillRect(l[0], l[1] - 16, 1, 16); ctx.fillRect(l[0] - 2, l[1] - 21, 5, 1); ctx.fillRect(l[0] - 2, l[1] - 16, 5, 1);
+        ctx.fillRect(l[0] - 2, l[1] - 20, 1, 4); ctx.fillRect(l[0] + 2, l[1] - 20, 1, 4); ctx.fillRect(l[0] - 2, l[1], 5, 1);
+        ctx.fillStyle = "#f5c451"; ctx.fillRect(l[0] - 1, l[1] - 20, 3, 4);
+        ctx.fillStyle = "#fff3a6"; ctx.fillRect(l[0], l[1] - 19, 1, 2);
+      });
+
+      if (trailEl) {
+        trailEl.classList.toggle("is-on", trailOn);
+        if (trailOn) {
+          trailEl.style.top = top0 + "px";
+          trailEl.style.height = (end - top0) + "px";
+          trailEl.style.left = (tx0 * PX + PX / 2) + "px";
+        }
+      }
+    }
+
+    function first() {
+      if (first.done) return; first.done = true;
+      paint();
+      root.classList.add("world-on");
+      var again = debounce(paint, 140);
+      window.addEventListener("resize", again);
+      if ("ResizeObserver" in window) new ResizeObserver(again).observe(doc.body);
+    }
+    /* the hero fills the first screen, so the world waits for fonts (stable layout)
+       and for an idle moment, keeping the one-off paint clear of the intro */
+    function kick() {
+      if (first.done) return;
+      if (window.requestIdleCallback) requestIdleCallback(first, { timeout: 1500 }); else setTimeout(first, 0);
+    }
+    if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(kick);
+    setTimeout(kick, 1200);
+  }
+
+  /* ---------------------------------------------------------
      Title + dialogue typing
      --------------------------------------------------------- */
   function initTitle() {
@@ -1071,5 +1582,6 @@
   safe(initCarousel, "carousel");
   safe(initInventory, "inventory");
   safe(initCampfire, "campfire");
+  safe(initWorld, "world");
   safe(initCat, "cat");
 })();
