@@ -9,6 +9,7 @@
 - `assets/avatar/`: Sabrina’s hand-pixelled avatar. `avatar.js` holds the sprites (`AVATAR_SPRITES`: 64×64 `base`, `blink`, `smile`, and a 32×32 `tiny`) in the same string format as `sprites.js`, with their own palette. `avatar-64.png` is the no-JS fallback.
 - `main.js`: canvas scenes, the world painter, cat AI, dialogue typing, carousel, tabs, inventory, nav
 - `style.css`: tokens, 9-slice pixel frames (inline SVG `border-image`), tiles (no-JS fallback), layouts
+- `assets/favicon.svg`: the HUD's pixel cat head (`catHead` sprite) with a cream halo, so it reads on light and dark tab strips. Both pages also carry a description, `theme-color` and Open Graph title/description (no image); `noindex` stays.
 
 ## One continuous world (refinement 1)
 Below the hero, every area sits on one painted ground (`initWorld` in `main.js`): a single canvas behind the page from the world map to the campfire, drawn at the world map's 3px art pixel with the map's pine sprite, path colours and ink outline. The journey follows the map's order:
@@ -21,6 +22,12 @@ Below the hero, every area sits on one painted ground (`initWorld` in `main.js`)
 - **The trail** from the world map continues down the left margin (dirt, flagstones in the cave, cut steps through rock) with a small clearing beside every area name. A sticky "You are here" marker (Sabrina’s 32px `tiny` sprite at 2x, with a cream outline) rides it at mid-screen. It only shows when the margin is at least about 100px wide (viewports of about 1380px and up); narrower screens keep the seams and biomes.
 - Each area's `--seam` CSS variable sets the strip height. The painter reads it, so spacing and art stay in sync.
 - `cv.html` (Save File) uses the same painter: the moonlit clearing dithers in from the hero's meadow, matching the Character Sheet.
+
+## Polish pass (refinement 4)
+- Fixed a 14 to 23px sideways scroll at 768 to 1280px: the Gallery Dungeon torch glow spilled past the viewport; the dungeon area now clips it (`overflow-x: clip`). Swept 360 to 1920px on both pages: no overflow.
+- Mobile carousel controls: counter and gems on one row, Prev/Next side by side (Next used to wrap alone).
+- CV cards sit in two stacked columns (Experience + Education, Direction + More about me), so the short Education card no longer leaves a hole.
+- Copy: typographic apostrophes, inventory descriptions all in first person, the credits line no longer claims "every pixel" is drawn in code (the HD portrait is a picture).
 
 ## Palette
 | Token | Hex | Use |
@@ -60,7 +67,8 @@ None. Vanilla JS and canvas only, so the page runs from `file://` and has no CDN
 - Pixel controls (buttons, HUD toggles, choices, quest tabs, map landmarks, inventory items) sink by 2px while pressed.
 - HUD: below 1300px the nav icons and the toggles' "on/off" words hide (the icons carry the state); the Map menu takes over at 980px and below.
 - Campfire footer: a canvas fire with logs and rising embers.
-- The world ground is painted once, never animated. The first paint waits for web fonts and an idle moment (`requestIdleCallback`), so it never lands on the intro. It repaints only when the layout changes (`ResizeObserver`, debounced). The "You are here" pin uses CSS `position: sticky`, so it needs no scroll handler.
+- The world ground is painted once, never animated. The first paint waits for web fonts and an idle moment (`requestIdleCallback`), so it never lands on the intro. All layout reads happen up front; the ground is then filled in ~12ms idle slices and the features, cave and commit each run as their own idle task, so no world task is a long task. The old canvas stays up until the new one commits. It repaints only when the layout changes (`ResizeObserver`, debounced). The "You are here" pin uses CSS `position: sticky`, so it needs no scroll handler.
+- Loops pause when unseen: the hero scene and campfire stop their `requestAnimationFrame` off screen and in hidden tabs; looping CSS sprites (torches, skill chips, blinking cursors) pause via an `is-offscreen` class on their area; the cat only writes her transform when she moves.
 
 ## The cat
 An original tuxedo cat, drawn from my own sprite data with midnight fur, green eyes and a green collar with a lantern bell. A cream halo keeps her readable on dark backgrounds.
@@ -99,9 +107,9 @@ Optional soft 8-bit effects, synthesised with WebAudio (square/triangle notes, f
 - CV: company, dates and institution "to be added"; disabled "PDF coming soon" button
 
 ## Accessibility
-Skip link, landmarks, one h1 per page, a visible lantern-yellow focus ring, ARIA tabs and listbox patterns, screen-reader copies of typed text, and decorative canvases marked `aria-hidden`. With `prefers-reduced-motion`, the scene is drawn once without animation, text appears without typing, the cat stays asleep (petting still works), the avatar doesn’t blink and HD switches instantly, map travel is an instant jump (no walk or iris), and the carousel slides without animation. With no JS the content stays fully visible: the avatar PNG shows, the map nodes become a list, and the carousel becomes a scroll-snap strip.
+Skip link, landmarks (the CV hero sits inside `main`), one h1 per page, a visible lantern-yellow focus ring (ink-brown inside cream boxes, where yellow would vanish; the HUD toggles dim their icon, not their ring), ARIA tabs and listbox patterns, screen-reader copies of typed text, and decorative canvases marked `aria-hidden`. The HUD scroll-spy uses `aria-current="location"` (the CV's own link `page`); its short labels "Gallery" and "Character" carry hidden " Dungeon" / " Sheet" so names match the headings. Quest tabs take Home/End. The carousel's live counter also names the frame ("Room 2 of 4: Character drawing, coming soon"). Small text meets WCAG AA (stamp red, card labels, CV meta, footers and `--muted` were darkened or lightened for it). Common ligatures are off: Pixelify Sans draws "fi" like an "A". With `prefers-reduced-motion`, the scene is drawn once without animation, text appears without typing, the cat stays asleep (petting still works), the avatar doesn’t blink and HD switches instantly, map travel is an instant jump (no walk or iris), and the carousel slides without animation. With no JS the content stays fully visible: the avatar PNG shows, the map nodes become a list (no empty map canvas), both quest pages stack (the tab list hides), inventory items show their names as chips, objectives show their ticks, the carousel becomes a scroll-snap strip, and below 980px the HUD lays its links out and scrolls away instead of needing the Map menu.
 
 ## Known limitations
 - The cat lives in viewport space (`position: fixed`). In full-page screenshots she shows up wherever the viewport bottom was at capture time.
 - Silkscreen is a caps-style face, so it is limited to area headings.
-- The world paint is a one-off main-thread task of about 50 to 130ms in headless Chrome (about 1M art pixels at 1440). It runs at idle and again only on layout change. Without JS, the per-area CSS tiles and edges remain as a simpler fallback.
+- The world paint is about 55 to 150ms of work in headless Chrome (about 1M art pixels at 1440), split into idle slices; the cave stage is the largest single task (~25 to 45ms). Sprite icons use CPU-backed canvases (`willReadFrequently`), which cut the boot task from ~150 to 220ms to ~60 to 100ms. Without JS, the per-area CSS tiles and edges remain as a simpler fallback.

@@ -4,9 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Save File · Sabrina's CV</title>
-<meta name="description" content="Sabrina's CV: web developer internship, computer science graduate, learning AI integrations and AI operations, aspiring cybersecurity analyst.">
+<title>Save File · Sabrina’s CV</title>
+<meta name="description" content="Sabrina’s CV: web developer internship, computer science graduate, learning AI Integrations and AI Operations, Aspiring Cybersecurity Analyst.">
 <meta name="theme-color" content="#0b1d22">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sabrina · Pixel Neko Quest">
+<meta property="og:title" content="Save File · Sabrina’s CV">
+<meta property="og:description" content="Sabrina’s CV: web developer internship, computer science graduate, learning AI Integrations and AI Operations, Aspiring Cybersecurity Analyst.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
@@ -28,10 +33,10 @@
       <ul>
         <li><a href="index.html#home"><i class="spr" data-spr="house" aria-hidden="true"></i><span>Village</span></a></li>
         <li><a href="index.html#projects"><i class="spr" data-spr="scroll" aria-hidden="true"></i><span>Quest Log</span></a></li>
-        <li><a href="index.html#art"><i class="spr" data-spr="gate" aria-hidden="true"></i><span>Gallery</span></a></li>
-        <li><a href="index.html#skills"><i class="spr" data-spr="banner" aria-hidden="true"></i><span>Character</span></a></li>
+        <li><a href="index.html#art"><i class="spr" data-spr="gate" aria-hidden="true"></i><span>Gallery<span class="sr-only"> Dungeon</span></span></a></li>
+        <li><a href="index.html#skills"><i class="spr" data-spr="banner" aria-hidden="true"></i><span>Character<span class="sr-only"> Sheet</span></span></a></li>
         <li><a href="index.html#blog"><i class="spr" data-spr="board" aria-hidden="true"></i><span>Notice Board</span></a></li>
-        <li><a href="cv.html" class="is-save" aria-current="true"><i class="spr" data-spr="crystal" aria-hidden="true"></i><span>Save File <small>CV</small></span></a></li>
+        <li><a href="cv.html" class="is-save" aria-current="page"><i class="spr" data-spr="crystal" aria-hidden="true"></i><span>Save File <small>CV</small></span></a></li>
       </ul>
     </nav>
     <button class="hud__cat" type="button" aria-pressed="true" title="Cat companion">
@@ -43,20 +48,21 @@
   </div>
 </header>
 
+<main id="main">
 <div class="cv-hero">
   <canvas class="landscape" id="cvScene" aria-hidden="true"></canvas>
   <div class="wrap cv-hero__text">
     <p class="hero__area">Save point</p>
     <h1 class="title-pixel">Save File</h1>
-    <p class="cv-hero__sub">Sabrina's CV, kept the way a game keeps your progress.</p>
+    <p class="cv-hero__sub">Sabrina’s CV, kept the way a game keeps your progress.</p>
   </div>
 </div>
 
-<main id="main" class="cv wrap">
+<div class="cv wrap">
   <section class="slot frame-dark" aria-label="Save slot">
     <div class="slot__portrait frame-gold">
       <div class="portrait" data-portrait>
-        <img class="portrait__px" src="assets/avatar/avatar-64.png" alt="pixel-art version of Sabrina's avatar" width="64" height="64">
+        <img class="portrait__px" src="assets/avatar/avatar-64.png" alt="pixel-art version of Sabrina’s avatar" width="64" height="64">
         <canvas aria-hidden="true" width="64" height="64"></canvas>
       </div>
     </div>
@@ -75,44 +81,48 @@
   </section>
 
   <div class="cv-grid">
-    <section class="cv-card frame-cream" aria-labelledby="cvExp">
-      <h2 id="cvExp" class="cv-card__title"><i class="spr" data-spr="scroll" aria-hidden="true"></i>Experience</h2>
-      <article class="cv-entry">
-        <h3>Web developer internship</h3>
-        <p class="cv-entry__meta">Company and dates to be added</p>
-        <ul class="cv-list">
-          <li>Redesigned the homepage: simpler content, clearer navigation, emphasized key actions, better spacing and typography.</li>
-          <li>Sketched the low-fidelity wireframe on paper and simplified the writing.</li>
-          <li>Developed a colour palette and brand guide, adopted by the team as official branding, with the logo colours updated to match.</li>
+    <div class="cv-col">
+      <section class="cv-card frame-cream" aria-labelledby="cvExp">
+        <h2 id="cvExp" class="cv-card__title"><i class="spr" data-spr="scroll" aria-hidden="true"></i>Experience</h2>
+        <article class="cv-entry">
+          <h3>Web developer internship</h3>
+          <p class="cv-entry__meta">Company and dates to be added</p>
+          <ul class="cv-list">
+            <li>Redesigned the homepage: simpler content, clearer navigation, emphasized key actions, better spacing and typography.</li>
+            <li>Sketched the low-fidelity wireframe on paper and simplified the writing.</li>
+            <li>Developed a colour palette and brand guide, adopted by the team as official branding, with the logo colours updated to match.</li>
+          </ul>
+          <a class="cv-link" href="index.html#projects">Read the full quest in the Quest Log</a>
+        </article>
+      </section>
+
+      <section class="cv-card frame-cream" aria-labelledby="cvEdu">
+        <h2 id="cvEdu" class="cv-card__title"><i class="spr" data-spr="book" aria-hidden="true"></i>Education</h2>
+        <article class="cv-entry">
+          <h3>Computer science graduate</h3>
+          <p class="cv-entry__meta">Institution and date to be added</p>
+        </article>
+      </section>
+    </div>
+
+    <div class="cv-col">
+      <section class="cv-card frame-cream" aria-labelledby="cvDir">
+        <h2 id="cvDir" class="cv-card__title"><i class="spr" data-spr="compass" aria-hidden="true"></i>Direction</h2>
+        <ul class="cv-dir">
+          <li><span>AI Integrations</span><p class="state state--learning">Learning</p></li>
+          <li><span>AI Operations</span><p class="state state--learning">Learning</p></li>
+          <li><span>Aspiring Cybersecurity Analyst</span><p class="state state--direction">Career direction</p></li>
         </ul>
-        <a class="cv-link" href="index.html#projects">Read the full quest in the Quest Log</a>
-      </article>
-    </section>
+        <a class="cv-link" href="index.html#skills">Open the Character Sheet</a>
+      </section>
 
-    <section class="cv-card frame-cream" aria-labelledby="cvEdu">
-      <h2 id="cvEdu" class="cv-card__title"><i class="spr" data-spr="book" aria-hidden="true"></i>Education</h2>
-      <article class="cv-entry">
-        <h3>Computer science graduate</h3>
-        <p class="cv-entry__meta">Institution and date to be added</p>
-      </article>
-    </section>
-
-    <section class="cv-card frame-cream" aria-labelledby="cvDir">
-      <h2 id="cvDir" class="cv-card__title"><i class="spr" data-spr="compass" aria-hidden="true"></i>Direction</h2>
-      <ul class="cv-dir">
-        <li><span>AI Integrations</span><p class="state state--learning">Learning</p></li>
-        <li><span>AI Operations</span><p class="state state--learning">Learning</p></li>
-        <li><span>Aspiring Cybersecurity Analyst</span><p class="state state--direction">Career direction</p></li>
-      </ul>
-      <a class="cv-link" href="index.html#skills">Open the Character Sheet</a>
-    </section>
-
-    <section class="cv-card frame-cream" aria-labelledby="cvMore">
-      <h2 id="cvMore" class="cv-card__title"><i class="spr" data-spr="sketchbook" aria-hidden="true"></i>More about me</h2>
-      <p class="cv-more">I work on automations, draw, and read manga and manhwa.</p>
-      <p class="cv-entry__meta">Also: creative problem solving, quick learning, communication.</p>
-      <a class="cv-link" href="index.html#art">Visit the Gallery Dungeon</a>
-    </section>
+      <section class="cv-card frame-cream" aria-labelledby="cvMore">
+        <h2 id="cvMore" class="cv-card__title"><i class="spr" data-spr="sketchbook" aria-hidden="true"></i>More about me</h2>
+        <p class="cv-more">I work on automations, draw, and read manga and manhwa.</p>
+        <p class="cv-entry__meta">Also: creative problem solving, quick learning, communication.</p>
+        <a class="cv-link" href="index.html#art">Visit the Gallery Dungeon</a>
+      </section>
+    </div>
   </div>
 
   <nav class="travel frame-dark" aria-label="Fast travel to homepage sections">
@@ -125,6 +135,7 @@
       <li><a href="index.html#blog"><i class="spr" data-spr="board" aria-hidden="true"></i>Notice Board</a></li>
     </ul>
   </nav>
+</div>
 </main>
 
 <footer class="cv-foot wrap">

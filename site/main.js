@@ -140,6 +140,9 @@
   /* ---------------------------------------------------------
      Sprites
      --------------------------------------------------------- */
+  /* small offscreen sprite canvases: CPU-backed, so toDataURL and setup stay cheap
+     (a GPU canvas costs ~2ms each to create and read back; the boot made dozens) */
+  var CPU = { willReadFrequently: true };
   var urlCache = {};
   function drawSprite(ctx, rows, ox, oy, scale, opts) {
     opts = opts || {};
@@ -162,7 +165,7 @@
     if (!rows) return "";
     var c = doc.createElement("canvas");
     c.width = rows[0].length; c.height = rows.length;
-    drawSprite(c.getContext("2d"), rows, 0, 0, 1);
+    drawSprite(c.getContext("2d", CPU), rows, 0, 0, 1);
     return (urlCache[name] = c.toDataURL());
   }
   function stripURL(names) {
@@ -171,7 +174,7 @@
     var w = S[names[0]][0].length, h = S[names[0]].length;
     var c = doc.createElement("canvas");
     c.width = w * names.length; c.height = h;
-    var x = c.getContext("2d");
+    var x = c.getContext("2d", CPU);
     names.forEach(function (n, i) { drawSprite(x, S[n], i * w, 0, 1); });
     return (urlCache[key] = c.toDataURL());
   }
@@ -192,7 +195,7 @@
       if (!urlCache[key]) {
         var c = doc.createElement("canvas");
         c.width = rows[0].length; c.height = rows.length;
-        drawSprite(c.getContext("2d"), rows, 0, 0, 1, { pal: A.palette });
+        drawSprite(c.getContext("2d", CPU), rows, 0, 0, 1, { pal: A.palette });
         urlCache[key] = c.toDataURL();
       }
       el.style.setProperty("--w", rows[0].length);
@@ -835,11 +838,12 @@
     return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
   }
 
+  var LITTLE_END = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
   function initWorld() {
     var PX = 3;
     var isCV = !!$(".page-cv");
     var cfg = isCV
-      ? { start: "#main", end: ".cv-foot", wrap: "#main", zones: [{ sel: "#main", biome: "clearing", blend: "village" }] }
+      ? { start: ".cv", end: ".cv-foot", wrap: ".cv", zones: [{ sel: ".cv", biome: "clearing", blend: "village" }] }
       : { start: "#map", end: "#contact", wrap: "#projects .wrap", trail: true, zones: [
           { sel: "#map", biome: "village" },
           { sel: "#projects", biome: "forest", seam: "treeline" },
@@ -882,7 +886,9 @@
     doc.body.insertBefore(box, doc.body.firstChild);
     var ctx = cv.getContext("2d");
     var trailEl = $(".trail");
-    var lastKey = "";
+    var lastKey = "", paintJob = 0;
+    /* run fn when the main thread is idle (each world stage is its own short task) */
+    function idle(fn) { if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 400 }); else setTimeout(fn, 16); }
 
     function paint() {
       var sy = window.pageYOffset || 0;
@@ -904,14 +910,20 @@
       var key = [W, H, cl].concat(zones.map(function (z) { return z.top + ":" + z.sh; })).join(",");
       if (key === lastKey) return;
       lastKey = key;
-
-      cv.width = W; cv.height = H;
-      cv.style.width = (W * PX) + "px"; cv.style.height = (H * PX) + "px";
-      box.style.top = top0 + "px"; box.style.height = (end - top0) + "px";
+      var job = ++paintJob;
+      /* every layout read happens here, up front: the painting below runs in
+         idle slices, and the page may scroll in between */
+      function snap(el) {
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        return { left: r.left, width: r.width, height: r.height, top: r.top + sy, bottom: r.bottom + sy };
+      }
+      var planksR = snap($(".board__planks")), fireR = snap($(".campfire")), iconRs = $$(".area-head__icon").map(snap);
 
       var img = ctx.createImageData(W, H), D = img.data;
       function set(x, y, c) {
         if (x < 0 || y < 0 || x >= W || y >= H) return;
+        if (D32) { D32[y * W + x] = word(c); return; }
         var k = (y * W + x) * 4; D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = 255;
       }
       function get(x, y) { var k = (y * W + x) * 4; return [D[k], D[k + 1], D[k + 2]]; }
@@ -936,17 +948,21 @@
       }
       function noise(x) { var x0 = nX0[x], f = nFX[x]; return nRow[x0] * (1 - f) + nRow[x0 + 1] * f; }
       /* boulders: jittered-cell (Voronoi) stones, lit from above */
-      var cellCache = {};
+      var cellCache = {}, lastCell = null;
       function cells(seed, sx, sy) {
+        /* rockAt asks for the same grid pixel after pixel: skip the string key then */
+        if (lastCell && lastCell.seed === seed && lastCell.sx === sx && lastCell.sy === sy) return lastCell.cc;
         var key2 = seed + ":" + sx + ":" + sy;
-        if (cellCache[key2]) return cellCache[key2];
+        if (cellCache[key2]) { lastCell = { seed: seed, sx: sx, sy: sy, cc: cellCache[key2] }; return lastCell.cc; }
         var cols = Math.ceil(W / sx) + 3, rows = Math.ceil(H / sy) + 3, ax = new Float32Array(cols * rows), ay = new Float32Array(cols * rows);
         for (var r = 0; r < rows; r++) for (var q = 0; q < cols; q++) {
           var qx = q - 1, qy = r - 1;
           ax[r * cols + q] = (qx + 0.2 + ih(qx, qy * 7 + seed) * 0.6) * sx;
           ay[r * cols + q] = (qy + 0.2 + ih(qx * 3 + seed, qy) * 0.6) * sy;
         }
-        return (cellCache[key2] = { cols: cols, ax: ax, ay: ay });
+        cellCache[key2] = { cols: cols, ax: ax, ay: ay };
+        lastCell = { seed: seed, sx: sx, sy: sy, cc: cellCache[key2] };
+        return cellCache[key2];
       }
       function rockAt(x, y, seed, sx, sy) {
         sx = sx || 11; sy = sy || 8;
@@ -980,11 +996,22 @@
       }
 
       /* ---- 1. ground ---- */
+      /* about a million art pixels: write whole RGBA words (little-endian) and
+         keep per-row maths out of the per-pixel loop */
+      var D32 = LITTLE_END ? new Uint32Array(D.buffer) : null;
+      function word(c) { return c.u || (c.u = ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0); }
       var nCells = (W >> 3) + 1, tuftX = new Int32Array(nCells), tuftY = new Int32Array(nCells), cellRow = -1;
-      for (var y = 0; y < H; y++) {
+      function groundRows(ya, yb) {
+      for (var y = ya; y < yb; y++) {
         var zi = zoneAt(y), z = zones[zi];
         noiseRow(y);
         var rowB = (zi > 0 || z.blend) && y < z.top + (z.sh || 14) ? null : z.b;
+        var moonRow = -1;
+        if (z.b.moon) {
+          var mh = z.bot - z.top - z.sh, my = z.top + z.sh + mh * 0.38, mdy = (y - my) / (mh * 0.46 + 1);
+          moonRow = mdy * mdy;
+        }
+        var rowK = y * W;
         if ((y >> 3) !== cellRow) {
           cellRow = y >> 3;
           for (var tc = 0; tc < nCells; tc++) {
@@ -999,9 +1026,8 @@
             var nz = noise(x);
             var by = BAYER[((y & 3) << 2) + (x & 3)];
             if (nz > 0.6 && by < (nz - 0.55) * 3) c = b.p;
-            if (b.moon && z.b === b) {
-              var mh = z.bot - z.top - z.sh, my = z.top + z.sh + mh * 0.38;
-              var mdx = (x - cx) / (W * 0.48), mdy = (y - my) / (mh * 0.46 + 1), md = Math.sqrt(mdx * mdx + mdy * mdy);
+            if (moonRow >= 0 && moonRow < 1 && z.b === b) {
+              var mdx = (x - cx) / (W * 0.48), md = Math.sqrt(mdx * mdx + moonRow);
               if (md < 1 && (1 - md) * 0.75 > by) c = c === b.p ? b.t : b.p;
             }
             var ccx = x >> 3, oy = tuftY[ccx];
@@ -1012,11 +1038,28 @@
             if (h < 0.035) c = b.d;
             if (h > 1 - b.fr) c = b.fl[Math.floor(ih(y, x) * b.fl.length)];
           }
-          var k = (y * W + x) * 4;
-          D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = 255;
+          if (D32) D32[rowK + x] = word(c);
+          else { var k = (rowK + x) * 4; D[k] = c[0]; D[k + 1] = c[1]; D[k + 2] = c[2]; D[k + 3] = 255; }
         }
       }
+      }
 
+      function outlineFill(x0, y0, x1, y1, inside, colour, ink) {
+        var w = x1 - x0, hgt = y1 - y0;
+        if (w <= 0 || hgt <= 0) return null;
+        var m = new Uint8Array(w * hgt);
+        for (var yy = 0; yy < hgt; yy++) for (var xx = 0; xx < w; xx++) if (inside(x0 + xx, y0 + yy)) m[yy * w + xx] = 1;
+        function at(xx, yy) { return xx < 0 || yy < 0 || xx >= w || yy >= hgt ? 1 : m[yy * w + xx]; }
+        for (var y2 = 0; y2 < hgt; y2++) for (var x2 = 0; x2 < w; x2++) {
+          if (!m[y2 * w + x2]) continue;
+          var edge = !at(x2 - 1, y2) || !at(x2 + 1, y2) || !at(x2, y2 - 1) || !at(x2, y2 + 1);
+          set(x0 + x2, y0 + y2, edge ? ink : colour(x0 + x2, y0 + y2));
+        }
+        return function (x, y) { var xx = x - x0, yy = y - y0; return xx >= 0 && yy >= 0 && xx < w && yy < hgt && m[yy * w + xx] === 1; };
+      }
+
+      var lamps = [], houses = [], trees = [], carve = new Uint8Array(H), cave = null;
+      function stageFeatures() {
       /* ---- 2. light pools (lamps, campfire) ---- */
       function glow(gx, gy, rx, ry, cols, strength) {
         for (var yy = Math.floor(gy - ry); yy <= gy + ry; yy++) for (var xx = Math.floor(gx - rx); xx <= gx + rx; xx++) {
@@ -1026,14 +1069,12 @@
           set(xx, yy, d < 0.35 ? cols[0] : d < 0.7 ? cols[1] : cols[2]);
         }
       }
-      var lamps = [], houses = [], trees = [];
       zones.forEach(function (z) {
         if (z.name === "square") {
           /* a cobbled village square under the notice board */
-          var planks = $(".board__planks");
-          if (planks) {
-            var br = planks.getBoundingClientRect();
-            var pcx = (br.left + br.width / 2) / PX, pcy = (br.top + br.height / 2 + 24 + sy - top0) / PX;
+          var br = planksR;
+          if (br) {
+            var pcx = (br.left + br.width / 2) / PX, pcy = (br.top + br.height / 2 + 24 - top0) / PX;
             var prx = br.width / 2 / PX + 18, pry = br.height / 2 / PX + 22;
             var COB = { base: [C("#4a5646"), C("#515d4c"), C("#465142")], hi: C("#66735d"), sh: C("#3a4539"), mo: C("#283126") };
             for (var qy = Math.floor(pcy - pry); qy <= pcy + pry; qy++) for (var qx = Math.floor(pcx - prx); qx <= pcx + prx; qx++) {
@@ -1049,10 +1090,9 @@
           lamps.forEach(function (l) { glow(l[0], l[1] + 1, 18, 10, [C("#5f6a34"), C("#46622f"), C("#2f5a33")], 0.9); });
         }
         if (z.name === "camp") {
-          var fire = $(".campfire");
-          if (fire) {
-            var fr = fire.getBoundingClientRect();
-            var fxp = Math.round((fr.left + fr.width / 2) / PX), fyp = Math.round((fr.bottom + sy - top0) / PX) - 2;
+          var fr = fireR;
+          if (fr) {
+            var fxp = Math.round((fr.left + fr.width / 2) / PX), fyp = Math.round((fr.bottom - top0) / PX) - 2;
             glow(fxp, fyp, 70, 30, [C("#3a3418"), C("#2a2c1a"), C("#1a2a1e")], 0.85);
           }
         }
@@ -1072,9 +1112,8 @@
           if (!tb.stone && ty % 14 === 6) set(tx + ((ty / 14) % 2 ? 1 : -1), ty, tb.path[1]);
         }
         /* a clearing on the trail beside every area name, like the map's landmarks */
-        $$(".area-head__icon").forEach(function (ic) {
-          var r = ic.getBoundingClientRect();
-          var ny = Math.round((r.top + r.height / 2 + sy - top0) / PX);
+        iconRs.forEach(function (r) {
+          var ny = Math.round((r.top + r.height / 2 - top0) / PX);
           if (ny < 4 || ny > H - 4) return;
           var nx = tX(ny), nb = biomeAt(nx, ny, zoneAt(ny));
           for (var yy = -5; yy <= 5; yy++) for (var xx = -8; xx <= 8; xx++) {
@@ -1086,21 +1125,6 @@
       }
 
       /* ---- 4. seams between areas ---- */
-      var carve = new Uint8Array(H);
-      function outlineFill(x0, y0, x1, y1, inside, colour, ink) {
-        var w = x1 - x0, hgt = y1 - y0;
-        if (w <= 0 || hgt <= 0) return null;
-        var m = new Uint8Array(w * hgt);
-        for (var yy = 0; yy < hgt; yy++) for (var xx = 0; xx < w; xx++) if (inside(x0 + xx, y0 + yy)) m[yy * w + xx] = 1;
-        function at(xx, yy) { return xx < 0 || yy < 0 || xx >= w || yy >= hgt ? 1 : m[yy * w + xx]; }
-        for (var y2 = 0; y2 < hgt; y2++) for (var x2 = 0; x2 < w; x2++) {
-          if (!m[y2 * w + x2]) continue;
-          var edge = !at(x2 - 1, y2) || !at(x2 + 1, y2) || !at(x2, y2 - 1) || !at(x2, y2 + 1);
-          set(x0 + x2, y0 + y2, edge ? ink : colour(x0 + x2, y0 + y2));
-        }
-        return function (x, y) { var xx = x - x0, yy = y - y0; return xx >= 0 && yy >= 0 && xx < w && yy < hgt && m[yy * w + xx] === 1; };
-      }
-
       function treeRow(z, rows, pal) {
         for (var r = 0; r < rows; r++) {
           var base = z.top + 11 + Math.round(r * (z.sh - 18) / Math.max(1, rows - 1));
@@ -1123,7 +1147,6 @@
         }
       }
 
-      var cave = null;
       zones.forEach(function (z, zi) {
         if (z.name === "village" || z.name === "forest") marginTrees(z, z.name === "forest" ? 0.42 : 0.16, null);
         if (z.name === "clearing" && !isCV) marginTrees(z, 0.1, PINE_PAL.clearing);
@@ -1156,6 +1179,9 @@
         }
       });
 
+      }
+
+      function stageCave() {
       /* the cave: cliff with a keystone arch, rock walls, stone steps out */
       if (cave) {
         var cz = cave.z, ez = cave.exit;
@@ -1279,6 +1305,12 @@
         }
       }
 
+      }
+
+      function stageCommit() {
+      cv.width = W; cv.height = H;
+      cv.style.width = (W * PX) + "px"; cv.style.height = (H * PX) + "px";
+      box.style.top = top0 + "px"; box.style.height = (end - top0) + "px";
       ctx.putImageData(img, 0, 0);
 
       /* ---- 5. sprites: pines (the world map's own), cottages, lamps ---- */
@@ -1287,7 +1319,7 @@
       function pineImg(pal) {
         for (var i = 0; i < pineCache.length; i++) if (pineCache[i][0] === pal) return pineCache[i][1];
         var pc = doc.createElement("canvas"); pc.width = S.pine[0].length; pc.height = S.pine.length;
-        drawSprite(pc.getContext("2d"), S.pine, 0, 0, 1, pal ? { pal: Object.assign({}, PAL, pal) } : null);
+        drawSprite(pc.getContext("2d", CPU), S.pine, 0, 0, 1, pal ? { pal: Object.assign({}, PAL, pal) } : null);
         pineCache.push([pal, pc]);
         return pc;
       }
@@ -1314,12 +1346,34 @@
           trailEl.style.left = (tx0 * PX + PX / 2) + "px";
         }
       }
+      }
+
+      /* about a million art pixels at 1440px: the ground goes in ~12ms idle
+         slices, then features, cave and commit each get their own idle task,
+         so no single main-thread task blocks scrolling or input for long.
+         The previous paint stays on screen until the new one commits. */
+      var gy = 0;
+      function live() { return job === paintJob; }
+      (function slice() {
+        if (!live()) return;
+        var t0 = performance.now();
+        do { var y2 = Math.min(H, gy + 24); groundRows(gy, y2); gy = y2; } while (gy < H && performance.now() - t0 < 12);
+        if (gy < H) { idle(slice); return; }
+        idle(function () {
+          if (!live()) return;
+          stageFeatures();
+          idle(function () {
+            if (!live()) return;
+            stageCave();
+            idle(function () { if (live()) { stageCommit(); root.classList.add("world-on"); } });
+          });
+        });
+      })();
     }
 
     function first() {
       if (first.done) return; first.done = true;
       paint();
-      root.classList.add("world-on");
       var again = debounce(paint, 140);
       window.addEventListener("resize", again);
       if ("ResizeObserver" in window) new ResizeObserver(again).observe(doc.body);
@@ -1406,7 +1460,7 @@
       if (frameCache[name]) return frameCache[name];
       var c = doc.createElement("canvas");
       c.width = c.height = N;
-      var x = c.getContext("2d");
+      var x = c.getContext("2d", CPU);
       /* warm parchment backdrop, Bayer-dithered towards the bottom */
       var top = hex("#f4ead0"), bot = hex("#e2cd9c"), img = x.createImageData(N, N), d = img.data;
       for (var y = 0; y < N; y++) for (var xx = 0; xx < N; xx++) {
@@ -1557,7 +1611,8 @@
         var id = en.target.id;
         if (id === current) return;
         current = id;
-        links.forEach(function (a) { if (a.getAttribute("data-area") === id) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current"); });
+        /* scroll-spy: "location" marks where you are on this page */
+        links.forEach(function (a) { if (a.getAttribute("data-area") === id) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current"); });
         if (userMoved && AREAS[id]) {
           showBanner(AREAS[id]);
           /* entering an area: its sign gives a single hop */
@@ -1568,6 +1623,15 @@
       });
     }, { rootMargin: "-42% 0px -52% 0px" });
     Object.keys(AREAS).forEach(function (id) { var el = doc.getElementById(id); if (el) io.observe(el); });
+  }
+
+  /* looping CSS sprites (torches, chips, blinking cursors) pause while their area is off screen */
+  function initAnimPause() {
+    if (RM || !("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (en) { en.target.classList.toggle("is-offscreen", !en.isIntersecting); });
+    }, { rootMargin: "120px 0px" });
+    $$(".hero, .area, .camp").forEach(function (el) { io.observe(el); });
   }
 
   /* ---------------------------------------------------------
@@ -1592,6 +1656,8 @@
         var k = e.key;
         if (k === "ArrowDown" || k === "ArrowRight") { e.preventDefault(); select((i + 1) % tabs.length, true); }
         if (k === "ArrowUp" || k === "ArrowLeft") { e.preventDefault(); select((i - 1 + tabs.length) % tabs.length, true); }
+        if (k === "Home") { e.preventDefault(); select(0, true); }
+        if (k === "End") { e.preventDefault(); select(tabs.length - 1, true); }
       });
     });
     select(0);
@@ -1634,7 +1700,7 @@
     if (!car) return;
     var vp = $(".gallery__viewport", car), track = $(".gallery__track", car);
     var slides = $$(".slide", car), n = slides.length, i = 0;
-    var dotsWrap = $(".gallery__dots", car), count = $("[data-count]", car);
+    var dotsWrap = $(".gallery__dots", car), count = $("[data-count]", car), countName = $("[data-count-name]", car);
     var dots = slides.map(function (_, k) {
       var b = doc.createElement("button");
       b.type = "button"; b.tabIndex = -1; b.setAttribute("aria-label", "Room " + (k + 1));
@@ -1666,6 +1732,9 @@
       });
       dots.forEach(function (d, j) { if (j === i) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current"); });
       if (count) count.textContent = String(i + 1);
+      /* screen readers hear which frame this room holds, not just its number */
+      var kind = $(".slide__kind", slides[i]), soon = $(".slide__soon", slides[i]);
+      if (countName) countName.textContent = kind ? ": " + kind.textContent + (soon ? ", " + soon.textContent : "") : "";
       layout();
     }
     $("[data-prev]", car).addEventListener("click", function () { go(i - 1); });
@@ -1785,7 +1854,7 @@
     function makeFrame(rows, flip, pal, glow) {
       var c = doc.createElement("canvas");
       c.width = FW * SC; c.height = FH * SC;
-      var x = c.getContext("2d");
+      var x = c.getContext("2d", CPU);
       var w = rows[0].length, h = rows.length;
       var at = function (cx, cy) { return cx >= 0 && cy >= 0 && cx < w && cy < h ? rows[cy].charAt(cx) : "."; };
       var fxp = function (cx) { return ((flip ? (w - 1 - cx) : cx) + 1) * SC; };
@@ -1831,7 +1900,7 @@
       since: performance.now(), nextGroom: 0, nextBlink: 0, hop: 0
     };
     var target = { x: cat.x, y: cat.y }, pointer = { x: -1, y: -1, t: 0, moved: false };
-    var enabled = true, raf = 0, last = 0, petting = false, lastPet = 0, lastZ = 0, drawn = "";
+    var enabled = true, raf = 0, last = 0, petting = false, lastPet = 0, lastZ = 0, drawn = "", lastTf = "";
     var STOP = 26;
     var auto = null, cool = {}, zone = "", lastZone = 0, lastCheck = 0, toys = [], toyN = 0;
     var CTRL = "a[href], button, input, select, textarea, [role=tab], [role=option]";
@@ -1860,7 +1929,9 @@
         ctx.drawImage((lit ? glowFrames : frames)[name][cat.face < 0 ? 1 : 0], 0, 0);
         drawn = key;
       }
-      cv.style.transform = "translate3d(" + Math.round(cat.x - FW * SC / 2) + "px," + Math.round(cat.y - FH * SC + SC - cat.hop) + "px,0)";
+      /* only touch the style when she actually moved: a sleeping cat costs no style work */
+      var tf = "translate3d(" + Math.round(cat.x - FW * SC / 2) + "px," + Math.round(cat.y - FH * SC + SC - cat.hop) + "px,0)";
+      if (tf !== lastTf) { cv.style.transform = tf; lastTf = tf; }
     }
     function pet() {
       lastPet = performance.now();
@@ -2259,6 +2330,7 @@
   safe(initDialogue, "dialogue");
   safe(initPortraits, "portraits");
   safe(initNav, "nav");
+  safe(initAnimPause, "anim-pause");
   safe(initAnchors, "anchors");
   safe(initMap, "map");
   safe(initQuests, "quests");
