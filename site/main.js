@@ -77,6 +77,22 @@
       el.style.setProperty("--h", rows.length);
       el.style.backgroundImage = "url(" + spriteURL(el.getAttribute("data-spr")) + ")";
     });
+    /* Sabrina's avatar sprites (assets/avatar/avatar.js) use their own palette */
+    var A = window.AVATAR_SPRITES;
+    if (A) $$("[data-avatar]", scope).forEach(function (el) {
+      var name = el.getAttribute("data-avatar"), rows = A[name];
+      if (!rows) return;
+      var key = "avatar:" + name;
+      if (!urlCache[key]) {
+        var c = doc.createElement("canvas");
+        c.width = rows[0].length; c.height = rows.length;
+        drawSprite(c.getContext("2d"), rows, 0, 0, 1, { pal: A.palette });
+        urlCache[key] = c.toDataURL();
+      }
+      el.style.setProperty("--w", rows[0].length);
+      el.style.setProperty("--h", rows.length);
+      el.style.backgroundImage = "url(" + urlCache[key] + ")";
+    });
   }
 
   /* ---------------------------------------------------------
@@ -380,6 +396,27 @@
     if (!map) return;
     var canvas = $(".map__terrain", map);
     var nodes = $$(".node", map);
+    /* the party marker: Sabrina's tiny sprite standing on the trail */
+    var party = doc.createElement("span");
+    party.className = "map__party"; party.setAttribute("aria-hidden", "true");
+    var partySpr = doc.createElement("i");
+    partySpr.className = "spr"; partySpr.setAttribute("data-avatar", "tiny");
+    party.appendChild(partySpr);
+    $(".map__nodes", map).insertAdjacentElement("beforebegin", party);
+    paintSprites(party);
+    var route = { samples: [], at: [], px: 3, node: 0 };
+    /* where the marker stands for landmark i: a few steps along the trail, clear of its sign */
+    function anchor(i) {
+      var sm = route.samples, k = route.at[i], dir = i === route.at.length - 1 ? -1 : 1, d = 0;
+      while (sm[k + dir] && d < (route.mobile ? 34 : 24)) { d += Math.hypot(sm[k + dir][0] - sm[k][0], sm[k + dir][1] - sm[k][1]); k += dir; }
+      return k;
+    }
+    function place(idx) {
+      var p = route.samples[idx];
+      if (!p) return;
+      party.style.left = Math.round(p[0] * route.px) + "px";
+      party.style.top = Math.round(p[1] * route.px) + "px";
+    }
     var POS_D = [[0.08, 0.6], [0.25, 0.3], [0.43, 0.66], [0.6, 0.32], [0.77, 0.64], [0.92, 0.33]];
     var POS_M = [[0.27, 0.13], [0.72, 0.28], [0.28, 0.44], [0.72, 0.59], [0.28, 0.75], [0.7, 0.9]];
 
@@ -408,8 +445,9 @@
       }
 
       /* path samples (Catmull-Rom) */
-      var samples = [];
+      var samples = [], at = [];
       for (var s = 0; s < pts.length - 1; s++) {
+        at.push(samples.length);
         var p0 = pts[Math.max(0, s - 1)], p1 = pts[s], p2 = pts[s + 1], p3 = pts[Math.min(pts.length - 1, s + 2)];
         var segLen = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
         var n = Math.ceil(segLen * 2);
@@ -422,6 +460,9 @@
         }
       }
       samples.push(pts[pts.length - 1]);
+      at.push(samples.length - 1);
+      route.samples = samples; route.at = at; route.px = px; route.mobile = mobile;
+      place(anchor(route.node));
 
       var lake = mobile ? { x: W * 0.78, y: H * 0.075, rx: Math.max(10, W * 0.13), ry: Math.max(7, H * 0.045) }
                         : { x: W * 0.52, y: H * 0.17, rx: W * 0.06, ry: H * 0.11 };
@@ -1084,52 +1125,119 @@
   }
 
   /* ---------------------------------------------------------
-     Portraits (pixelated party member, HD toggle)
+     Party-member portrait: Sabrina's hand-pixelled avatar
+     (assets/avatar/avatar.js), drawn 1:1 on a 64x64 canvas and scaled
+     by whole numbers in CSS. She blinks now and then and smiles while
+     her box is hovered or focused. The HD switch dithers the sprite
+     away to reveal the original picture, and back again.
      --------------------------------------------------------- */
+  var AV = window.AVATAR_SPRITES || null;
   var portraits = [];
+  function avatarRows(name) {
+    if (name !== "blinkSmile") return AV[name];
+    var r = AV.smile.slice();
+    AV.blink.forEach(function (row, i) { if (row !== AV.base[i]) r[i] = row; });
+    return r;
+  }
   function initPortraits() {
-    var CROP = { x: 64, y: 34, w: 608, h: 608 };
+    if (!AV) return;
+    var N = AV.base.length;
+    var frameCache = {};
+    function frame(name) {
+      if (frameCache[name]) return frameCache[name];
+      var c = doc.createElement("canvas");
+      c.width = c.height = N;
+      var x = c.getContext("2d");
+      /* warm parchment backdrop, Bayer-dithered towards the bottom */
+      var top = hex("#f4ead0"), bot = hex("#e2cd9c"), img = x.createImageData(N, N), d = img.data;
+      for (var y = 0; y < N; y++) for (var xx = 0; xx < N; xx++) {
+        var col = (y / N) * 1.15 - 0.1 > bayer(xx, y) ? bot : top, k = (y * N + xx) * 4;
+        d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
+      }
+      x.putImageData(img, 0, 0);
+      drawSprite(x, avatarRows(name), 0, 0, 1, { pal: AV.palette });
+      return (frameCache[name] = c);
+    }
+    var HD_SRC = "assets/pfp.jpg";
+    var HD_ALT = "Sabrina's profile picture: an anime-style portrait with dark wavy hair";
+
     $$("[data-portrait]").forEach(function (el) {
-      var img = $("img", el), cv = $("canvas", el);
-      if (!img || !cv) return;
+      var cv = $("canvas", el), pxImg = $(".portrait__px", el);
+      if (!cv) return;
       var ctx = cv.getContext("2d");
-      var res = +el.getAttribute("data-res") || 36;
-      var tmp = doc.createElement("canvas"); tmp.width = tmp.height = 144;
-      var P = { el: el, hd: false, timer: 0 };
-      function prep() {
-        var tctx = tmp.getContext("2d");
-        tctx.imageSmoothingEnabled = true; tctx.imageSmoothingQuality = "high";
-        tctx.drawImage(img, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, 144, 144);
-      }
-      function draw(n) {
-        if (!n) {
-          var dpr = Math.min(window.devicePixelRatio || 1, 2);
-          cv.width = Math.round(el.clientWidth * dpr); cv.height = Math.round(el.clientHeight * dpr);
-          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(img, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, cv.width, cv.height);
-          el.classList.add("is-hd");
-          return;
+      cv.width = cv.height = N;
+      var P = { el: el, hd: false, mask: 0, blink: false, smile: false, seen: true, timer: 0, blinkT: 0, photo: null };
+      var pxAlt = pxImg ? pxImg.getAttribute("alt") : "";
+
+      function render() {
+        var name = P.smile ? (P.blink ? "blinkSmile" : "smile") : (P.blink ? "blink" : "base");
+        ctx.clearRect(0, 0, N, N);
+        if (P.mask >= 1) return;
+        ctx.drawImage(frame(name), 0, 0);
+        /* the HD dissolve: clear 2x2 cells in ordered-dither order */
+        if (P.mask > 0) for (var y = 0; y < N; y += 2) for (var x = 0; x < N; x += 2) {
+          if (bayer(x >> 1, y >> 1) < P.mask) ctx.clearRect(x, y, 2, 2);
         }
-        el.classList.remove("is-hd");
-        cv.width = n; cv.height = n;
-        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(tmp, 0, 0, n, n);
       }
+      function photo() {
+        if (P.photo) return P.photo;
+        var im = doc.createElement("img");
+        im.className = "portrait__hd"; im.alt = ""; im.decoding = "async";
+        im.src = HD_SRC;
+        el.insertBefore(im, el.firstChild);
+        return (P.photo = im);
+      }
+      function blinkOnce(then) { P.blink = true; render(); setTimeout(function () { P.blink = false; render(); if (then) then(); }, 130); }
+      function blinkLoop() {
+        clearTimeout(P.blinkT);
+        if (RM) return;
+        P.blinkT = setTimeout(function () {
+          if (!P.hd && P.seen && !doc.hidden) blinkOnce(Math.random() < 0.18 ? function () { setTimeout(blinkOnce, 140); } : null);
+          blinkLoop();
+        }, 2400 + Math.random() * 3800);
+      }
+
       P.set = function (hd) {
+        if (hd === P.hd) return;
         P.hd = hd;
         clearTimeout(P.timer);
-        var seq = hd ? [res, 48, 72, 108, 0] : [108, 72, 48, res];
-        if (RM) seq = [hd ? 0 : res];
+        var im = photo();
+        /* swap which image carries the description */
+        if (pxAlt) { im.alt = hd ? HD_ALT : ""; if (pxImg) pxImg.alt = hd ? "" : pxAlt; }
+        el.classList.add("is-hd");
+        var seq = hd ? [0.25, 0.5, 0.75, 1] : [0.75, 0.5, 0.25, 0];
+        if (RM) seq = [hd ? 1 : 0];
         var i = 0;
-        (function next() { draw(seq[i]); i++; if (i < seq.length) P.timer = setTimeout(next, 75); })();
+        function next() {
+          P.mask = seq[i++]; render();
+          if (i < seq.length) P.timer = setTimeout(next, 80);
+          else if (!hd) el.classList.remove("is-hd");
+        }
+        /* first time: wait for the picture, so the dither reveals it rather than a blank */
+        if (hd && !(im.complete && im.naturalWidth)) {
+          var go = function () { im.removeEventListener("load", go); im.removeEventListener("error", go); if (P.hd) next(); };
+          im.addEventListener("load", go); im.addEventListener("error", go);
+        } else next();
       };
-      function ready() {
-        try { prep(); draw(res); el.classList.add("is-ready"); } catch (e) { /* leave the plain image */ }
-      }
-      if (img.complete && img.naturalWidth) ready(); else img.addEventListener("load", ready);
+
+      var host = el.closest(".dlg__box, .card, .slot") || el;
+      function smile(on) { if (P.smile !== on) { P.smile = on; render(); } }
+      host.addEventListener("pointerenter", function () { smile(true); });
+      host.addEventListener("pointerleave", function () { if (!host.contains(doc.activeElement)) smile(false); });
+      host.addEventListener("focusin", function () { smile(true); });
+      host.addEventListener("focusout", function (e) { if (!host.contains(e.relatedTarget) && !host.matches(":hover")) smile(false); });
+
+      if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { P.seen = es[0].isIntersecting; }).observe(el);
+      render();
+      el.classList.add("is-ready");
+      blinkLoop();
       portraits.push(P);
     });
     $$(".hd-toggle").forEach(function (btn) {
+      /* start fetching the picture as soon as someone reaches for the switch */
+      function warm() { portraits.forEach(function (p) { if (!p.photo) { var im = new Image(); im.src = HD_SRC; } }); }
+      btn.addEventListener("pointerenter", warm, { once: true });
+      btn.addEventListener("focus", warm, { once: true });
       btn.addEventListener("click", function () {
         var on = btn.getAttribute("aria-pressed") !== "true";
         $$(".hd-toggle").forEach(function (b) { b.setAttribute("aria-pressed", String(on)); });

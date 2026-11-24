@@ -6,6 +6,7 @@
 - `index.html`: Village (hero + world map) → Quest Log (projects) → Gallery Dungeon (art) → Character Sheet (skills) → Notice Board (blog) → Campfire (footer)
 - `cv.html`: "Save File", a load-game style CV page with fast-travel links back to every section
 - `sprites.js`: every sprite as hand-written pixel strings (cat frames, landmarks, inventory items, icons, flames)
+- `assets/avatar/`: Sabrina’s hand-pixelled avatar. `avatar.js` holds the sprites (`AVATAR_SPRITES`: 64×64 `base`, `blink`, `smile`, and a 32×32 `tiny`) in the same string format as `sprites.js`, with their own palette. `avatar-64.png` is the no-JS fallback.
 - `main.js`: canvas scenes, the world painter, cat AI, dialogue typing, carousel, tabs, inventory, nav
 - `style.css`: tokens, 9-slice pixel frames (inline SVG `border-image`), tiles (no-JS fallback), layouts
 
@@ -17,7 +18,7 @@ Below the hero, every area sits on one painted ground (`initWorld` in `main.js`)
 - **Fence and gate** seam (lantern-capped gate posts, flower beds, a cottage in the right margin) → **Notice Board** on a cobbled village square flanked by two lamps.
 - **Night treeline** seam → **Campfire** ground with a dithered firelight pool under the fire.
 - The ground gets darker as you go deeper, apart from the moonlit clearing and lamp-lit square, so the scroll reads as one walk through the night.
-- **The trail** from the world map continues down the left margin (dirt, flagstones in the cave, cut steps through rock) with a small clearing beside every area name. A sticky "You are here" pin rides it at mid-screen. It only shows when the margin is at least about 100px wide (viewports of about 1380px and up); narrower screens keep the seams and biomes.
+- **The trail** from the world map continues down the left margin (dirt, flagstones in the cave, cut steps through rock) with a small clearing beside every area name. A sticky "You are here" marker (Sabrina’s 32px `tiny` sprite at 2x, with a cream outline) rides it at mid-screen. It only shows when the margin is at least about 100px wide (viewports of about 1380px and up); narrower screens keep the seams and biomes.
 - Each area's `--seam` CSS variable sets the strip height. The painter reads it, so spacing and art stay in sync.
 - `cv.html` (Save File) uses the same painter: the moonlit clearing dithers in from the hero's meadow, matching the Character Sheet.
 
@@ -49,8 +50,8 @@ None. Vanilla JS and canvas only, so the page runs from `file://` and has no CDN
 ## Motion & interaction
 - Hero: a procedural parallax pixel landscape on canvas (dithered sky with Bayer ordered dithering, moon halo, twinkling stars, mountains, pine ridges, a cottage with chimney smoke and a flickering lamp, framing trees, a flower meadow). Layers shift with the mouse and scroll. Fireflies drift around and are pulled gently toward the cursor. Runs at a deliberate 30fps and pauses offscreen.
 - Title letters drop in with stepped timing; the dialogue box rises, the tagline types out letter by letter (click or Enter skips), then the choice menu appears with a blinking ▶ cursor and a bobbing ▼ prompt that jumps to the world map.
-- Party-member portrait: the profile picture is drawn pixelated (36px) on canvas. The **HD** switch "upscales" it through 48→72→108→full resolution steps, and back again.
-- World map: a procedurally drawn pixel map (meadow noise, lake, forests, dirt trail on a Catmull-Rom path with footprints). Landmarks are real links; they hop on hover or focus. It has a separate portrait layout for mobile.
+- Party-member portrait: Sabrina’s hand-pixelled 64×64 avatar, drawn 1:1 on a canvas over a dithered parchment backdrop and shown only at whole-number scales (128px in the dialogue box and on the CV, 192px on the Character Sheet) with `image-rendering: pixelated`. She blinks every few seconds (sometimes twice) while on screen, and smiles while her box (dialogue box, character card, save slot) is hovered or has focus. The **HD** switch dissolves the sprite away in four ordered-dither steps to reveal the original `assets/pfp.jpg` (fetched only when the switch is first reached for), and dithers back. Pixel art is the default. Alt text follows what is shown: "pixel-art version of Sabrina’s avatar", or the picture’s description in HD; the Character Sheet copy is decorative (`alt=""`).
+- World map: a procedurally drawn pixel map (meadow noise, lake, forests, dirt trail on a Catmull-Rom path with footprints). Landmarks are real links; they hop on hover or focus. Sabrina’s `tiny` sprite stands on the trail beside the current landmark as the party marker. It has a separate portrait layout for mobile.
 - Quest Log: keyboard-accessible quest tabs (arrow keys). The objective checkboxes tick one by one when the list scrolls into view. A locked "unwritten quest" tab holds the "more projects soon" slot.
 - Gallery Dungeon: a looping carousel with prev/next, gem position dots, a "Room n of 4" counter, arrow keys and swipe or drag. Torches flicker using 3-frame sprite-strip animation.
 - Character Sheet: big skill names with quest-state chips (In practice: a blinking dot; Learning: cycling pips; Career direction: a diamond), plus an inventory grid with a roving tab index, arrow-key navigation, and a description window.
@@ -76,10 +77,9 @@ An original tuxedo cat, drawn from my own sprite data with midnight fur, green e
 - CV: company, dates and institution "to be added"; disabled "PDF coming soon" button
 
 ## Accessibility
-Skip link, landmarks, one h1 per page, a visible lantern-yellow focus ring, ARIA tabs and listbox patterns, screen-reader copies of typed text, and decorative canvases marked `aria-hidden`. With `prefers-reduced-motion`, the scene is drawn once without animation, text appears without typing, the cat stays asleep (petting still works), and the carousel slides without animation. With no JS the content stays fully visible: the plain image shows, the map nodes become a list, and the carousel becomes a scroll-snap strip.
+Skip link, landmarks, one h1 per page, a visible lantern-yellow focus ring, ARIA tabs and listbox patterns, screen-reader copies of typed text, and decorative canvases marked `aria-hidden`. With `prefers-reduced-motion`, the scene is drawn once without animation, text appears without typing, the cat stays asleep (petting still works), the avatar doesn’t blink and HD switches instantly, and the carousel slides without animation. With no JS the content stays fully visible: the avatar PNG shows, the map nodes become a list, and the carousel becomes a scroll-snap strip.
 
 ## Known limitations
-- The pixelated portrait can't be colour-quantised, because canvas pixels can't be read under `file://` (tainted canvas). It is downsampled only, and a cream multiply blend replaces the white background.
 - The cat lives in viewport space (`position: fixed`). In full-page screenshots she shows up wherever the viewport bottom was at capture time.
 - Silkscreen is a caps-style face, so it is limited to area headings.
 - The world paint is a one-off main-thread task of about 50 to 130ms in headless Chrome (about 1M art pixels at 1440). It runs at idle and again only on layout change. Without JS, the per-area CSS tiles and edges remain as a simpler fallback.
