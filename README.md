@@ -19,9 +19,9 @@ Checks cover continuous homepage sections, section links, the separate CV docume
 
 The intended workflow is: edit here, run the checks, commit and push to GitHub, then let Vercel build and deploy.
 
-Connect the GitHub repository to the existing `sabrina-portfolio` Vercel project. Keep the Vercel Root Directory at the repository root. The root `vercel.json` specifies the build command and generated public directory. Use `main` as the production branch; other branches and pull requests can have preview deployments.
+The repository is [aidibekova03-droid/portfolio](https://github.com/aidibekova03-droid/portfolio), owned by Sabrina. It is connected to the existing `sabrina-portfolio` Vercel project. Keep the Vercel Root Directory at the repository root. The root `vercel.json` specifies the build command and generated public directory. Use `main` as the production branch; other branches and pull requests can have preview deployments.
 
-GitHub repository creation, access invitations, and the Vercel Git connection must be verified before treating automatic deployment as active. A direct CLI deployment alone does not establish this connection.
+The Git connection is configured; the first production build is being verified. Saqlain's invitation to edit and merge is pending acceptance. A direct CLI deployment alone does not establish the Git connection.
 
 ## Collaboration and content
 
