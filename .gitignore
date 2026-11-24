@@ -1,0 +1,7 @@
+.superpowers/
+.tools/
+.vercel/
+deploy/**/.vercel/
+.env*
+node_modules/
+deploy/*.zip
