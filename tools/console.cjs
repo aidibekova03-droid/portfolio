@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Print browser console output (incl. uncaught errors) for a variant page.
-// Usage: node variants/_tools/console.cjs <variant-folder> [page=index.html]
+// Usage: node tools/console.cjs <folder> [page=index.html]
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");

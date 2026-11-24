@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "node scripts/export-preview.cjs",
+  "buildCommand": "node scripts/build-site.cjs",
   "outputDirectory": "deploy/sabrina-portfolio",
   "installCommand": ""
 }

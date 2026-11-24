@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Screenshot a variant page with local headless Chrome via the DevTools protocol.
-// Usage: node variants/_tools/shoot.cjs <variant-folder> [page=index.html]
-// Writes <variant-folder>/_shots/:
+// Usage: node tools/shoot.cjs <folder> [page=index.html]
+// Writes <folder>/_shots/:
 //   {page}-desktop.png       1440x900 first screen
 //   {page}-desktop-full.png  1440 wide, full page (scrolled through first so reveals fire)
 //   {page}-mobile-full.png   true 390 wide mobile emulation, full page

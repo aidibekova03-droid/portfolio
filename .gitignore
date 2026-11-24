@@ -6,6 +6,6 @@ deploy/**/.vercel/
 node_modules/
 deploy/*.zip
 
-# Variant review screenshots (large); keep only gallery thumbnails
-variants/*/_shots/*.png
-variants/_tools/_shots/
+# Local review screenshots and generated build output
+site/_shots/
+deploy/
