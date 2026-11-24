@@ -16,7 +16,7 @@ Screenshots land in `site/_shots/` (ignored by git). `site/NOTES.md` documents t
 
 ## Versions
 
-Refinements are committed one at a time on the `pixel-neko` branch so any of them can be reverted. The tag `pixel-neko-v1-baseline` is the design as originally chosen:
+Refinements are committed one at a time on the `pixel-neko` branch so any of them can be reverted. The tag `pixel-neko-v1-baseline` is the design as originally chosen, and `pixel-neko-v2` is the version after the first round of refinements:
 
 ```powershell
 git log --oneline pixel-neko-v1-baseline..   # list refinements since the baseline
