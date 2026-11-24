@@ -5,3 +5,7 @@ deploy/**/.vercel/
 .env*
 node_modules/
 deploy/*.zip
+
+# Variant review screenshots (large); keep only gallery thumbnails
+variants/*/_shots/*.png
+variants/_tools/_shots/

@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sabrina · Pixel Neko Quest</title>
+<meta name="description" content="Sabrina's portfolio: computer science graduate exploring AI and cybersecurity. A cozy pixel quest through projects, drawings and skills.">
+<meta name="theme-color" content="#0b1d22">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============ HUD / top menu ============ -->
+<header class="hud" id="hud">
+  <div class="hud__inner frame-dark">
+    <a class="hud__brand" href="#home" aria-label="Sabrina, back to the village">
+      <i class="spr" data-spr="catHead" aria-hidden="true"></i>
+      <span>Sabrina</span>
+    </a>
+    <button class="hud__menu" type="button" aria-expanded="false" aria-controls="hudNav">
+      <i class="spr" data-spr="compass" aria-hidden="true"></i><span>Map</span>
+    </button>
+    <nav class="hud__nav" id="hudNav" aria-label="Areas">
+      <ul>
+        <li><a href="#home" data-area="home"><i class="spr" data-spr="house" aria-hidden="true"></i><span>Village</span></a></li>
+        <li><a href="#projects" data-area="projects"><i class="spr" data-spr="scroll" aria-hidden="true"></i><span>Quest Log</span></a></li>
+        <li><a href="#art" data-area="art"><i class="spr" data-spr="gate" aria-hidden="true"></i><span>Gallery</span></a></li>
+        <li><a href="#skills" data-area="skills"><i class="spr" data-spr="banner" aria-hidden="true"></i><span>Character</span></a></li>
+        <li><a href="#blog" data-area="blog"><i class="spr" data-spr="board" aria-hidden="true"></i><span>Notice Board</span></a></li>
+        <li><a href="cv.html" class="is-save"><i class="spr" data-spr="crystal" aria-hidden="true"></i><span>Save File <small>CV</small></span></a></li>
+      </ul>
+    </nav>
+    <button class="hud__cat" type="button" aria-pressed="true" title="Cat companion">
+      <i class="spr" data-spr="paw" aria-hidden="true"></i><span class="sr-only">Cat companion</span><span class="hud__cat-state" aria-hidden="true">on</span>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ VILLAGE (home) ============ -->
+  <section id="home" class="village" aria-labelledby="heroTitle">
+    <div class="hero">
+      <canvas class="landscape" id="heroScene" aria-hidden="true"></canvas>
+      <div class="hero__veil" aria-hidden="true"></div>
+
+      <div class="hero__title wrap">
+        <p class="hero__area">The Village</p>
+        <h1 id="heroTitle" class="title-pixel"><span class="t-small">Hi, I'm</span> <span class="t-big">Sabrina.</span></h1>
+      </div>
+
+      <div class="dlg wrap">
+        <div class="dlg__box frame-cream">
+          <figure class="party">
+            <div class="party__frame frame-gold">
+              <div class="portrait" data-portrait>
+                <img src="../assets/pfp.jpg" alt="Sabrina's profile picture: an anime-style portrait with dark wavy hair" width="736" height="1308">
+                <canvas aria-hidden="true"></canvas>
+              </div>
+            </div>
+            <figcaption class="party__cap">
+              <span class="party__name">Sabrina</span>
+              <button class="hd-toggle" type="button" aria-pressed="false" data-hd-for="0">
+                <span class="hd-toggle__track" aria-hidden="true"><span class="hd-toggle__knob"></span></span>
+                <span class="hd-toggle__label">HD</span>
+              </button>
+            </figcaption>
+          </figure>
+
+          <div class="dlg__body">
+            <p class="dlg__tag">Sabrina</p>
+            <p class="dlg__text" data-type>Computer science graduate exploring AI and cybersecurity.</p>
+            <p class="dlg__ask">Where shall we go first?</p>
+            <ul class="dlg__choices" aria-label="Choose a path">
+              <li><a class="choice" href="#projects">Explore my work</a></li>
+              <li><a class="choice" href="#art">See my drawings</a></li>
+            </ul>
+            <a class="dlg__next" href="#map" aria-label="Continue to the world map"><span aria-hidden="true">▼</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- world map -->
+    <div class="worldmap wrap" id="map">
+      <div class="area-head">
+        <i class="spr area-head__icon" data-spr="compass" aria-hidden="true"></i>
+        <div>
+          <h2 class="title-pixel">World Map</h2>
+          <p class="area-head__lead">Five areas and a save point, all on one path. Pick a landmark to travel there.</p>
+        </div>
+      </div>
+      <div class="map frame-wood">
+        <canvas class="map__terrain" aria-hidden="true"></canvas>
+        <ol class="map__nodes">
+          <li><a href="#home" class="node" data-node="0"><i class="spr" data-spr="house" aria-hidden="true"></i><span class="node__plate"><b>Village</b><small>Home</small></span></a></li>
+          <li><a href="#projects" class="node" data-node="1"><i class="spr" data-spr="scroll" aria-hidden="true"></i><span class="node__plate"><b>Quest Log</b><small>Projects</small></span></a></li>
+          <li><a href="#art" class="node" data-node="2"><i class="spr" data-spr="gate" aria-hidden="true"></i><span class="node__plate"><b>Gallery Dungeon</b><small>Art</small></span></a></li>
+          <li><a href="#skills" class="node" data-node="3"><i class="spr" data-spr="banner" aria-hidden="true"></i><span class="node__plate"><b>Character Sheet</b><small>Skills</small></span></a></li>
+          <li><a href="#blog" class="node" data-node="4"><i class="spr" data-spr="board" aria-hidden="true"></i><span class="node__plate"><b>Notice Board</b><small>Blog</small></span></a></li>
+          <li><a href="cv.html" class="node node--save" data-node="5"><i class="spr" data-spr="crystal" aria-hidden="true"></i><span class="node__plate"><b>Save File</b><small>CV</small></span></a></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUEST LOG (projects) ============ -->
+  <section id="projects" class="area area--quest" aria-labelledby="projectsTitle">
+    <div class="wrap">
+      <div class="area-head">
+        <i class="spr area-head__icon" data-spr="scroll" aria-hidden="true"></i>
+        <div>
+          <p class="area-head__real">Projects</p>
+          <h2 id="projectsTitle" class="title-pixel">Quest Log</h2>
+          <p class="area-head__lead">Work written up as quests. One is complete, the next pages are still blank.</p>
+        </div>
+      </div>
+
+      <div class="quests">
+        <div class="quests__list frame-dark" role="tablist" aria-label="Quests" aria-orientation="vertical">
+          <p class="quests__heading" aria-hidden="true">Quests</p>
+          <button class="qtab" role="tab" id="qt-1" aria-controls="qp-1" aria-selected="true">
+            <i class="spr" data-spr="check" aria-hidden="true"></i>
+            <span><b>A clearer homepage</b><small>Complete</small></span>
+          </button>
+          <button class="qtab" role="tab" id="qt-2" aria-controls="qp-2" aria-selected="false" tabindex="-1">
+            <i class="spr" data-spr="lock" aria-hidden="true"></i>
+            <span><b>Unwritten quest</b><small>More projects soon</small></span>
+          </button>
+        </div>
+
+        <article class="quest frame-cream" role="tabpanel" id="qp-1" aria-labelledby="qt-1">
+          <header class="quest__head">
+            <p class="quest__label">Web developer internship</p>
+            <p class="quest__status"><i class="spr" data-spr="star" aria-hidden="true"></i>Quest complete</p>
+          </header>
+          <h3 class="quest__title">A clearer homepage</h3>
+          <p class="quest__summary">Simpler content. Clearer navigation. Brand palette adopted by the team.</p>
+
+          <figure class="shot frame-gold">
+            <div class="shot__inner">
+              <i class="spr" data-spr="scroll" aria-hidden="true"></i>
+              <figcaption><b>Project image coming soon</b><span>A screenshot of the redesigned homepage will hang here.</span></figcaption>
+            </div>
+          </figure>
+
+          <div class="quest__grid">
+            <section class="qblock qblock--brief">
+              <h4>The challenge</h4>
+              <p>The homepage was text-heavy, cluttered, and difficult to navigate.</p>
+            </section>
+            <section class="qblock qblock--obj">
+              <h4>My contribution</h4>
+              <ul class="objectives" data-objectives>
+                <li>Sketched a low-fidelity wireframe on paper</li>
+                <li>Simplified the writing</li>
+                <li>Emphasized key actions</li>
+                <li>Improved spacing and typography</li>
+                <li>Developed a colour palette and brand guide</li>
+              </ul>
+            </section>
+            <section class="qblock qblock--reward">
+              <h4><i class="spr" data-spr="chest" aria-hidden="true"></i>The result</h4>
+              <p>The team redesigned the homepage and adopted the palette as official branding, updating the logo colours to match. The team was pleased.</p>
+            </section>
+          </div>
+        </article>
+
+        <article class="quest quest--locked frame-cream" role="tabpanel" id="qp-2" aria-labelledby="qt-2">
+          <i class="spr" data-spr="lock" aria-hidden="true"></i>
+          <h3 class="quest__title">This page is still blank</h3>
+          <p>More projects soon. New quests get written here as they're finished.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GALLERY DUNGEON (art) ============ -->
+  <section id="art" class="area area--dungeon" aria-labelledby="artTitle">
+    <div class="wrap">
+      <div class="area-head">
+        <i class="spr area-head__icon" data-spr="gate" aria-hidden="true"></i>
+        <div>
+          <p class="area-head__real">Art</p>
+          <h2 id="artTitle" class="title-pixel">Gallery Dungeon</h2>
+          <p class="area-head__lead">Selected drawings. Portraits and characters, drawn on paper.</p>
+        </div>
+      </div>
+
+      <div class="gallery" data-carousel role="region" aria-roledescription="carousel" aria-label="Drawings" tabindex="0">
+        <div class="torch torch--l" aria-hidden="true"><i class="flame"></i></div>
+        <div class="torch torch--r" aria-hidden="true"><i class="flame"></i></div>
+        <div class="gallery__viewport">
+          <ol class="gallery__track">
+            <li class="slide" aria-roledescription="slide" aria-label="1 of 4">
+              <div class="slide__frame frame-gold"><div class="slide__canvas"><span class="slide__kind">Featured portrait</span><span class="slide__soon">coming soon</span></div></div>
+              <p class="slide__plate">Placeholder frame. Artwork not yet hung.</p>
+            </li>
+            <li class="slide" aria-roledescription="slide" aria-label="2 of 4">
+              <div class="slide__frame frame-gold"><div class="slide__canvas"><span class="slide__kind">Character drawing</span><span class="slide__soon">coming soon</span></div></div>
+              <p class="slide__plate">Placeholder frame. Artwork not yet hung.</p>
+            </li>
+            <li class="slide" aria-roledescription="slide" aria-label="3 of 4">
+              <div class="slide__frame frame-gold"><div class="slide__canvas"><span class="slide__kind">Portrait study</span><span class="slide__soon">coming soon</span></div></div>
+              <p class="slide__plate">Placeholder frame. Artwork not yet hung.</p>
+            </li>
+            <li class="slide" aria-roledescription="slide" aria-label="4 of 4">
+              <div class="slide__frame frame-gold"><div class="slide__canvas"><span class="slide__kind">Character sketch</span><span class="slide__soon">coming soon</span></div></div>
+              <p class="slide__plate">Placeholder frame. Artwork not yet hung.</p>
+            </li>
+          </ol>
+        </div>
+        <div class="gallery__controls">
+          <button class="pbtn" type="button" data-prev aria-label="Previous drawing"><span aria-hidden="true">◀</span> Prev</button>
+          <div class="gallery__dots" aria-hidden="true"></div>
+          <p class="gallery__count" aria-live="polite">Room <b data-count>1</b> of 4</p>
+          <button class="pbtn" type="button" data-next aria-label="Next drawing">Next <span aria-hidden="true">▶</span></button>
+        </div>
+        <p class="gallery__hint">Use the arrow keys or swipe to walk between rooms.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER SHEET (skills) ============ -->
+  <section id="skills" class="area area--sheet" aria-labelledby="skillsTitle">
+    <div class="wrap">
+      <div class="area-head">
+        <i class="spr area-head__icon" data-spr="banner" aria-hidden="true"></i>
+        <div>
+          <p class="area-head__real">Skills &amp; direction</p>
+          <h2 id="skillsTitle" class="title-pixel">Character Sheet</h2>
+          <p class="area-head__lead">No made-up stat bars. Each skill shows its quest state: in practice, learning, or the direction I'm heading.</p>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <aside class="card frame-cream" aria-label="Character card">
+          <div class="card__portrait frame-gold">
+            <div class="portrait" data-portrait data-res="28">
+              <img src="../assets/pfp.jpg" alt="" width="736" height="1308">
+              <canvas aria-hidden="true"></canvas>
+            </div>
+          </div>
+          <p class="card__name">Sabrina</p>
+          <dl class="card__stats">
+            <div><dt>Class</dt><dd>Computer science graduate</dd></div>
+            <div><dt>Exploring</dt><dd>AI and cybersecurity</dd></div>
+            <div><dt>Side quests</dt><dd>Drawing, manga and manhwa</dd></div>
+          </dl>
+        </aside>
+
+        <ol class="skills">
+          <li class="skill skill--practice frame-cream">
+            <i class="spr skill__icon" data-spr="lantern" aria-hidden="true"></i>
+            <div class="skill__body">
+              <h3 class="skill__name">Web Design</h3>
+              <p class="skill__note">Used on a real project. <a href="#projects">Read the homepage quest</a></p>
+            </div>
+            <p class="state state--practice"><span class="state__dot" aria-hidden="true"></span>In practice</p>
+          </li>
+          <li class="skill skill--learning frame-cream">
+            <i class="spr skill__icon" data-spr="book" aria-hidden="true"></i>
+            <div class="skill__body">
+              <h3 class="skill__name">AI Integrations</h3>
+              <p class="skill__note">Quest in progress.</p>
+            </div>
+            <p class="state state--learning"><span class="state__pips" aria-hidden="true"><i></i><i></i><i></i></span>Learning</p>
+          </li>
+          <li class="skill skill--learning frame-cream">
+            <i class="spr skill__icon" data-spr="book" aria-hidden="true"></i>
+            <div class="skill__body">
+              <h3 class="skill__name">AI Operations</h3>
+              <p class="skill__note">Quest in progress.</p>
+            </div>
+            <p class="state state--learning"><span class="state__pips" aria-hidden="true"><i></i><i></i><i></i></span>Learning</p>
+          </li>
+          <li class="skill skill--direction frame-cream">
+            <i class="spr skill__icon" data-spr="compass" aria-hidden="true"></i>
+            <div class="skill__body">
+              <h3 class="skill__name">Aspiring Cybersecurity Analyst</h3>
+              <p class="skill__note">The main quest. An aspiration, not a job title.</p>
+            </div>
+            <p class="state state--direction"><span class="state__dot" aria-hidden="true"></span>Career direction</p>
+          </li>
+        </ol>
+      </div>
+
+      <div class="inventory frame-dark">
+        <div class="inventory__head">
+          <h3>Inventory</h3>
+          <p>What comes along on every quest. Pick an item to inspect it.</p>
+        </div>
+        <div class="inventory__body">
+          <ul class="inv-grid" role="listbox" aria-label="Inventory items" data-inventory>
+            <li role="option" tabindex="0" aria-selected="true" data-name="Automations" data-desc="I work on automations, letting small scripts carry the repetitive load."><i class="spr" data-spr="gear" aria-hidden="true"></i><span class="sr-only">Automations</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Creative problem solving" data-desc="A key for doors that look locked. Finding a simpler way through a messy problem."><i class="spr" data-spr="key" aria-hidden="true"></i><span class="sr-only">Creative problem solving</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Quick learning" data-desc="Winged boots. New tools and ideas get picked up fast."><i class="spr" data-spr="boots" aria-hidden="true"></i><span class="sr-only">Quick learning</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Communication" data-desc="A sealed letter. Clear words, plain writing, and keeping the team in the loop."><i class="spr" data-spr="letter" aria-hidden="true"></i><span class="sr-only">Communication</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Sketchbook" data-desc="Portraits and characters, drawn on paper. Pages will hang in the Gallery Dungeon."><i class="spr" data-spr="sketchbook" aria-hidden="true"></i><span class="sr-only">Sketchbook</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Manga and manhwa" data-desc="Always a volume in the bag. Sabrina reads manga and manhwa."><i class="spr" data-spr="books" aria-hidden="true"></i><span class="sr-only">Manga and manhwa</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Empty slot" data-desc="Room for whatever the next quest hands over." class="is-empty"><span class="sr-only">Empty slot</span></li>
+            <li role="option" tabindex="-1" aria-selected="false" data-name="Empty slot" data-desc="Room for whatever the next quest hands over." class="is-empty"><span class="sr-only">Empty slot</span></li>
+          </ul>
+          <div class="inv-info frame-cream" aria-live="polite">
+            <p class="inv-info__name" data-inv-name>Automations</p>
+            <p class="inv-info__desc" data-inv-desc>I work on automations, letting small scripts carry the repetitive load.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOTICE BOARD (blog) ============ -->
+  <section id="blog" class="area area--board" aria-labelledby="blogTitle">
+    <div class="wrap">
+      <div class="area-head">
+        <i class="spr area-head__icon" data-spr="board" aria-hidden="true"></i>
+        <div>
+          <p class="area-head__real">Blog</p>
+          <h2 id="blogTitle" class="title-pixel">Notice Board</h2>
+          <p class="area-head__lead">Posts get pinned here. Nothing is published yet, so these notes are holding the spots.</p>
+        </div>
+      </div>
+
+      <div class="board">
+        <div class="board__planks">
+          <article class="note note--a">
+            <span class="note__pin" aria-hidden="true"></span>
+            <p class="note__stamp">First post in progress</p>
+            <h3 class="note__title">Post title</h3>
+            <p class="note__text">The first note is being written. It will be pinned here when it's ready.</p>
+            <i class="spr note__quill" data-spr="quill" aria-hidden="true"></i>
+          </article>
+          <article class="note note--b">
+            <span class="note__pin" aria-hidden="true"></span>
+            <p class="note__stamp">Coming soon</p>
+            <h3 class="note__title">Notes on design, art &amp; security</h3>
+            <p class="note__text">A future series. Placeholder card, no post yet.</p>
+          </article>
+          <article class="note note--c">
+            <span class="note__pin" aria-hidden="true"></span>
+            <p class="note__stamp">Coming soon</p>
+            <h3 class="note__title">Post title</h3>
+            <div class="note__lines" aria-hidden="true"><i></i><i></i><i></i></div>
+            <p class="sr-only">Placeholder card, no post yet.</p>
+          </article>
+        </div>
+        <div class="board__legs" aria-hidden="true"><i></i><i></i></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ CAMPFIRE (footer) ============ -->
+<footer id="contact" class="camp" aria-labelledby="campTitle">
+  <div class="wrap camp__inner">
+    <canvas class="campfire" width="40" height="36" aria-hidden="true"></canvas>
+    <div class="camp__text">
+      <h2 id="campTitle" class="title-pixel">Campfire</h2>
+      <p>Rest here a while. Contact details coming soon.</p>
+      <div class="camp__actions">
+        <a class="pbtn pbtn--gold" href="cv.html"><i class="spr" data-spr="crystal" aria-hidden="true"></i>Open save file (CV)</a>
+        <a class="pbtn" href="#home">Back to the village</a>
+      </div>
+    </div>
+  </div>
+  <p class="camp__credits wrap">Sabrina's portfolio. Every pixel, the landscape and the cat are drawn in code.</p>
+</footer>
+
+<div class="area-banner frame-dark" aria-hidden="true"><small>Now entering</small><b data-banner-name></b></div>
+
+<script src="sprites.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
