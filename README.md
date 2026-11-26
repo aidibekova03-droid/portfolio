@@ -1,30 +1,33 @@
 # Sabrina's portfolio
 
-Midnight Companion is Sabrina's navy and warm-yellow portfolio design. The current site is a static design preview: one scrolling homepage for Home, Projects, Art, Skills, and Blog, plus a separate CV page. Artwork, project screenshots, and formal CV details are still being collected. Next.js remains the planned framework for the eventual application.
+**Pixel Neko Quest** is the active design: Sabrina's portfolio as a cozy 16-bit RPG, with a moonlit pixel village, a world map, a quest log, a gallery dungeon, a character sheet and a pixel cat that follows your cursor. One scrolling homepage covers Home, Projects, Art, Skills and Blog, and the CV is a separate "Save File" page. Artwork, project screenshots and formal CV details are still being collected and are clearly labelled placeholders.
 
 ## Edit and check
 
-The editable design source is `design/midnight-collaborative-review-v6.html`. Change this source first; `scripts/export-preview.cjs` generates the standalone public files and removes the in-chat editing controls.
-
-Requirements: a current Node.js LTS release. No npm dependencies are required.
+The site source is `site/` (static HTML, CSS and vanilla JS; no npm dependencies). Open `site/index.html` directly in a browser to preview it.
 
 ```powershell
-node scripts/export-preview.cjs
-node scripts/verify-preview.cjs
+node scripts/build-site.cjs          # copies site/ to deploy/sabrina-portfolio/
+node tools/shoot.cjs site            # 1440px + true 390px screenshots, console errors
+node tools/shoot.cjs site cv.html
 ```
 
-Checks cover continuous homepage sections, section links, the separate CV document and return links, carousel behavior, and local assets. They use a minimal DOM fixture; browser layout review is a separate step.
+Screenshots land in `site/_shots/` (ignored by git). `site/NOTES.md` documents the palette, fonts, motion, the cat and every placeholder.
 
-## GitHub and Vercel
+## Versions
 
-The intended workflow is: edit here, run the checks, commit and push to GitHub, then let Vercel build and deploy.
+Refinements are committed one at a time on the `pixel-neko` branch so any of them can be reverted. The tag `pixel-neko-v1-baseline` is the design as originally chosen, and `pixel-neko-v2` is the version after the first round of refinements:
 
-The repository is [aidibekova03-droid/portfolio](https://github.com/aidibekova03-droid/portfolio), owned by Sabrina. It is connected to the existing `sabrina-portfolio` Vercel project. Keep the Vercel Root Directory at the repository root. The root `vercel.json` specifies the build command and generated public directory. Use `main` as the production branch; other branches and pull requests can have preview deployments.
+```powershell
+git log --oneline pixel-neko-v1-baseline..   # list refinements since the baseline
+git revert <commit>                           # undo one refinement
+git switch --detach pixel-neko-v1-baseline    # look at the original
+```
 
-Automatic production deployment was verified from a commit to `main`. The [live site](https://sabrina-portfolio-hazel.vercel.app/) has the scrolling homepage and a separate [CV](https://sabrina-portfolio-hazel.vercel.app/cv.html). Saqlain's invitation to edit and merge is pending acceptance. A direct CLI deployment alone does not establish the Git connection.
+## Deployment
+
+`vercel.json` runs `node scripts/build-site.cjs` and serves `deploy/sabrina-portfolio`. The preview is marked `noindex` while content is placeholder. The older Midnight Companion design and its export scripts (`design/`, `scripts/export-preview.cjs`) are kept for history.
 
 ## Collaboration and content
 
-Read `AGENTS.md` for confirmed design decisions and factual copy. Keep proposed library and visual changes labelled as proposals until reviewed. Preserve the one-page homepage and separate CV structure.
-
-No credentials, `.env` files, local CLI sessions, or `.vercel` account metadata belong in the repository. The preview deliberately remains marked `noindex` while its placeholder content is being refined. Reference images and older exploratory designs remain local historical material.
+Read `AGENTS.md` for confirmed facts and decisions, and `docs/BRIEF.md` for the content rules every design follows. Never invent projects, employers, dates, links or metrics. The cats and illustrations are drawn in code and are not Sabrina's artwork. `docs/RESEARCH.md` lists design tooling worth using. Other explored designs are parked in the private repo `saqlainartaz/sabrina-portfolio-variants`.

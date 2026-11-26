@@ -5,3 +5,7 @@ deploy/**/.vercel/
 .env*
 node_modules/
 deploy/*.zip
+
+# Local review screenshots and generated build output
+site/_shots/
+deploy/

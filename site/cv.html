@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Save File · Sabrina’s CV</title>
+<meta name="description" content="Sabrina’s CV: web developer internship, computer science graduate, learning AI Integrations and AI Operations, Aspiring Cybersecurity Analyst.">
+<meta name="theme-color" content="#0b1d22">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sabrina · Pixel Neko Quest">
+<meta property="og:title" content="Save File · Sabrina’s CV">
+<meta property="og:description" content="Sabrina’s CV: web developer internship, computer science graduate, learning AI Integrations and AI Operations, Aspiring Cybersecurity Analyst.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-cv">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hud" id="hud">
+  <div class="hud__inner frame-dark">
+    <a class="hud__brand" href="index.html#home" aria-label="Sabrina, back to the village">
+      <i class="spr" data-spr="catHead" aria-hidden="true"></i>
+      <span>Sabrina</span>
+    </a>
+    <button class="hud__menu" type="button" aria-expanded="false" aria-controls="hudNav">
+      <i class="spr" data-spr="compass" aria-hidden="true"></i><span>Map</span>
+    </button>
+    <nav class="hud__nav" id="hudNav" aria-label="Areas">
+      <ul>
+        <li><a href="index.html#home"><i class="spr" data-spr="house" aria-hidden="true"></i><span>Village</span></a></li>
+        <li><a href="index.html#projects"><i class="spr" data-spr="scroll" aria-hidden="true"></i><span>Quest Log</span></a></li>
+        <li><a href="index.html#art"><i class="spr" data-spr="gate" aria-hidden="true"></i><span>Gallery<span class="sr-only"> Dungeon</span></span></a></li>
+        <li><a href="index.html#skills"><i class="spr" data-spr="banner" aria-hidden="true"></i><span>Character<span class="sr-only"> Sheet</span></span></a></li>
+        <li><a href="index.html#blog"><i class="spr" data-spr="board" aria-hidden="true"></i><span>Notice Board</span></a></li>
+        <li><a href="cv.html" class="is-save" aria-current="page"><i class="spr" data-spr="crystal" aria-hidden="true"></i><span>Save File <small>CV</small></span></a></li>
+      </ul>
+    </nav>
+    <button class="hud__cat" type="button" aria-pressed="true" title="Cat companion">
+      <i class="spr" data-spr="paw" aria-hidden="true"></i><span class="sr-only">Cat companion</span><span class="hud__cat-state" aria-hidden="true">on</span>
+    </button>
+    <button class="hud__snd" type="button" aria-pressed="false" title="Sound effects: off (click to turn on)">
+      <i class="spr" data-spr="sndOff" aria-hidden="true"></i><span class="sr-only">Sound effects</span><span class="hud__snd-state" aria-hidden="true">off</span>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+<div class="cv-hero">
+  <canvas class="landscape" id="cvScene" aria-hidden="true"></canvas>
+  <div class="wrap cv-hero__text">
+    <p class="hero__area">Save point</p>
+    <h1 class="title-pixel">Save File</h1>
+    <p class="cv-hero__sub">Sabrina’s CV, kept the way a game keeps your progress.</p>
+  </div>
+</div>
+
+<div class="cv wrap">
+  <section class="slot frame-dark" aria-label="Save slot">
+    <div class="slot__portrait frame-gold">
+      <div class="portrait" data-portrait>
+        <img class="portrait__px" src="assets/avatar/avatar-64.png" alt="pixel-art version of Sabrina’s avatar" width="64" height="64">
+        <canvas aria-hidden="true" width="64" height="64"></canvas>
+      </div>
+    </div>
+    <div class="slot__info">
+      <p class="slot__file">File 1</p>
+      <h2 class="slot__name">Sabrina</h2>
+      <p class="slot__tag">Computer science graduate exploring AI and cybersecurity.</p>
+      <button class="hd-toggle" type="button" aria-pressed="false">
+        <span class="hd-toggle__track" aria-hidden="true"><span class="hd-toggle__knob"></span></span>
+        <span class="hd-toggle__label">Portrait in HD</span>
+      </button>
+    </div>
+    <div class="slot__actions">
+      <button class="pbtn" type="button" disabled aria-disabled="true">PDF coming soon</button>
+    </div>
+  </section>
+
+  <div class="cv-grid">
+    <div class="cv-col">
+      <section class="cv-card frame-cream" aria-labelledby="cvExp">
+        <h2 id="cvExp" class="cv-card__title"><i class="spr" data-spr="scroll" aria-hidden="true"></i>Experience</h2>
+        <article class="cv-entry">
+          <h3>Web developer internship</h3>
+          <p class="cv-entry__meta">Company and dates to be added</p>
+          <ul class="cv-list">
+            <li>Redesigned the homepage: simpler content, clearer navigation, emphasized key actions, better spacing and typography.</li>
+            <li>Sketched the low-fidelity wireframe on paper and simplified the writing.</li>
+            <li>Developed a colour palette and brand guide, adopted by the team as official branding, with the logo colours updated to match.</li>
+          </ul>
+          <a class="cv-link" href="index.html#projects">Read the full quest in the Quest Log</a>
+        </article>
+      </section>
+
+      <section class="cv-card frame-cream" aria-labelledby="cvEdu">
+        <h2 id="cvEdu" class="cv-card__title"><i class="spr" data-spr="book" aria-hidden="true"></i>Education</h2>
+        <article class="cv-entry">
+          <h3>Computer science graduate</h3>
+          <p class="cv-entry__meta">Institution and date to be added</p>
+        </article>
+      </section>
+    </div>
+
+    <div class="cv-col">
+      <section class="cv-card frame-cream" aria-labelledby="cvDir">
+        <h2 id="cvDir" class="cv-card__title"><i class="spr" data-spr="compass" aria-hidden="true"></i>Direction</h2>
+        <ul class="cv-dir">
+          <li><span>AI Integrations</span><p class="state state--learning">Learning</p></li>
+          <li><span>AI Operations</span><p class="state state--learning">Learning</p></li>
+          <li><span>Aspiring Cybersecurity Analyst</span><p class="state state--direction">Career direction</p></li>
+        </ul>
+        <a class="cv-link" href="index.html#skills">Open the Character Sheet</a>
+      </section>
+
+      <section class="cv-card frame-cream" aria-labelledby="cvMore">
+        <h2 id="cvMore" class="cv-card__title"><i class="spr" data-spr="sketchbook" aria-hidden="true"></i>More about me</h2>
+        <p class="cv-more">I work on automations, draw, and read manga and manhwa.</p>
+        <p class="cv-entry__meta">Also: creative problem solving, quick learning, communication.</p>
+        <a class="cv-link" href="index.html#art">Visit the Gallery Dungeon</a>
+      </section>
+    </div>
+  </div>
+
+  <nav class="travel frame-dark" aria-label="Fast travel to homepage sections">
+    <p class="travel__title">Fast travel</p>
+    <ul>
+      <li><a href="index.html#home"><i class="spr" data-spr="house" aria-hidden="true"></i>Village</a></li>
+      <li><a href="index.html#projects"><i class="spr" data-spr="scroll" aria-hidden="true"></i>Quest Log</a></li>
+      <li><a href="index.html#art"><i class="spr" data-spr="gate" aria-hidden="true"></i>Gallery Dungeon</a></li>
+      <li><a href="index.html#skills"><i class="spr" data-spr="banner" aria-hidden="true"></i>Character Sheet</a></li>
+      <li><a href="index.html#blog"><i class="spr" data-spr="board" aria-hidden="true"></i>Notice Board</a></li>
+    </ul>
+  </nav>
+</div>
+</main>
+
+<footer class="cv-foot wrap">
+  <p>Progress saved. Contact details coming soon.</p>
+</footer>
+
+<div class="area-banner frame-dark" aria-hidden="true"><small>Now entering</small><b data-banner-name></b></div>
+
+<script src="sprites.js"></script>
+<script src="assets/avatar/avatar.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
